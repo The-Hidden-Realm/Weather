@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { WishScore } from "@/lib/weather/types";
+import { WISH_BANDS } from "@/lib/weather/wishScore";
+import { WisHowToReadModal } from "@/components/WisHowToReadModal";
 
 const COLOR_VAR: Record<WishScore["color"], string> = {
   good: "var(--good)",
@@ -10,7 +12,20 @@ const COLOR_VAR: Record<WishScore["color"], string> = {
 };
 
 export function WishGauge({ wish }: { wish: WishScore }) {
-  const [open, setOpen] = useState(false);
+  const [howToReadOpen, setHowToReadOpen] = useState(false);
+  const [warningOpen, setWarningOpen] = useState(false);
+  const warningRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function onClickOutside(e: MouseEvent) {
+      if (warningRef.current && !warningRef.current.contains(e.target as Node)) {
+        setWarningOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, []);
+
   const radius = 54;
   const circumference = 2 * Math.PI * radius;
   const offset = circumference * (1 - wish.score / 100);
@@ -20,14 +35,37 @@ export function WishGauge({ wish }: { wish: WishScore }) {
     <div className="rounded-2xl border border-border bg-surface/70 p-5">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-sm font-medium text-muted">WIS Score</h2>
+          <div className="flex items-center gap-1.5">
+            <h2 className="text-sm font-medium text-muted">WIS Score</h2>
+            <span className="rounded-full bg-accent/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-accent-2">
+              Beta
+            </span>
+            <div ref={warningRef} className="relative">
+              <button
+                type="button"
+                onClick={() => setWarningOpen((o) => !o)}
+                aria-label="About this score"
+                className="flex text-warn hover:text-warn/80"
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M12 9v4M12 17h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" />
+                </svg>
+              </button>
+              {warningOpen && (
+                <div className="absolute left-0 z-20 mt-2 w-56 rounded-lg border border-border bg-surface-2 p-3 text-xs text-foreground shadow-xl">
+                  Experimental score for informational purposes only — not an official weather warning and
+                  not a substitute for National Weather Service alerts.
+                </div>
+              )}
+            </div>
+          </div>
           <p className="text-xs text-muted/70">Weather Intensity Score</p>
         </div>
         <button
-          onClick={() => setOpen((o) => !o)}
+          onClick={() => setHowToReadOpen(true)}
           className="rounded-md px-2 py-1 text-xs text-accent-2 hover:bg-accent/10"
         >
-          {open ? "Hide breakdown" : "Breakdown"}
+          How to read
         </button>
       </div>
 
@@ -63,42 +101,35 @@ export function WishGauge({ wish }: { wish: WishScore }) {
             {wish.label}
           </div>
           <p className="mt-2 max-w-[16rem] text-sm text-muted">
-            {describeScore(wish)}
+            {WISH_BANDS.find((b) => b.label === wish.label)?.description}
           </p>
         </div>
       </div>
 
-      {open && (
-        <div className="mt-4 space-y-2 border-t border-border pt-4">
-          {wish.factors.map((f) => (
-            <div key={f.label} className="flex items-center gap-3 text-xs">
-              <span className="w-36 shrink-0 text-muted">{f.label}</span>
-              <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-2">
-                <div
-                  className="h-full rounded-full bg-accent"
-                  style={{ width: `${Math.min(100, (f.contribution / 26) * 100)}%` }}
-                />
-              </div>
-              <span className="w-6 text-right text-muted">{f.contribution}</span>
-            </div>
-          ))}
-        </div>
+      {wish.alertsUnavailable && (
+        <p className="mt-4 flex items-start gap-2 rounded-xl border border-warn/40 bg-warn/10 p-3 text-xs text-warn">
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            className="mt-0.5 shrink-0"
+          >
+            <path d="M12 9v4M12 17h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" />
+          </svg>
+          Active alerts couldn&rsquo;t be checked for this update — this score may understate risk.
+        </p>
+      )}
+
+      {howToReadOpen && (
+        <WisHowToReadModal
+          currentScore={wish.score}
+          alertsUnavailable={wish.alertsUnavailable}
+          onClose={() => setHowToReadOpen(false)}
+        />
       )}
     </div>
   );
-}
-
-function describeScore(wish: WishScore): string {
-  switch (wish.label) {
-    case "Calm":
-      return "Mild conditions all around. Nothing to plan around today.";
-    case "Breezy":
-      return "A little wind or moisture in the mix, but nothing disruptive.";
-    case "Active":
-      return "Noticeable wind, rain, or temperature swings — worth a glance before heading out.";
-    case "Rough":
-      return "Conditions are turning unpleasant. Expect wind, precipitation, or extreme temps.";
-    default:
-      return "Significant weather in play. Check alerts and plan accordingly.";
-  }
 }

@@ -61,6 +61,10 @@ export type WishScore = {
   label: string;
   color: "good" | "warn" | "danger";
   factors: { label: string; contribution: number }[];
+  // True when the NWS alerts feed failed for this update — the alerts
+  // factor was scored as zero for lack of data, not because none are
+  // active, so the score may understate real risk.
+  alertsUnavailable: boolean;
 };
 
 export type WeatherPayload = {

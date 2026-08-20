@@ -11,14 +11,6 @@ export function formatTime(iso: string, timezone: string, hour12 = true): string
   });
 }
 
-export function formatHour(iso: string, timezone: string, hour12 = true): string {
-  return new Date(iso).toLocaleTimeString("en-US", {
-    hour: "numeric",
-    timeZone: timezone,
-    hour12,
-  });
-}
-
 export function formatDay(iso: string, timezone: string): string {
   return new Date(iso).toLocaleDateString("en-US", {
     weekday: "short",

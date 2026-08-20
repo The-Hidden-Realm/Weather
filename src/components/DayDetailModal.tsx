@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import type { DailyPoint, HourlyPoint } from "@/lib/weather/types";
 import { describeWeatherCode } from "@/lib/weather/wmo";
 import { WeatherIcon } from "@/components/WeatherIcon";
-import { formatDate, formatHour, formatTemp } from "@/lib/weather/format";
+import { formatDate, formatTime, formatTemp } from "@/lib/weather/format";
 
 export function DayDetailModal({
   day,
@@ -102,7 +102,7 @@ export function DayDetailModal({
             const { icon: hourIcon } = describeWeatherCode(h.weatherCode, h.isDay);
             return (
               <div key={h.time} className="flex items-center gap-3 py-2.5">
-                <span className="w-14 shrink-0 text-xs text-muted">{formatHour(h.time, timezone, hour12)}</span>
+                <span className="w-16 shrink-0 text-xs text-muted">{formatTime(h.time, timezone, hour12)}</span>
                 <WeatherIcon icon={hourIcon} className="h-7 w-7 shrink-0" />
                 <span className="w-10 flex-1 text-sm font-semibold text-foreground">
                   {formatTemp(h.temperature)}
