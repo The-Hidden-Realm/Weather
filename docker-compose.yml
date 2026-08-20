@@ -1,0 +1,22 @@
+services:
+  weather-app:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      ADMIN_USERNAME: Admin
+      ADMIN_PASSWORD_FILE: /run/secrets/admin_password
+      SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET in your .env file}
+      CONTACT_EMAIL: ${CONTACT_EMAIL:-}
+    secrets:
+      - admin_password
+    volumes:
+      - weather-data:/app/data
+    restart: unless-stopped
+
+secrets:
+  admin_password:
+    file: ./secrets/admin_password.txt
+
+volumes:
+  weather-data:

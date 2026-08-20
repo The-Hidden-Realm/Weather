@@ -1,0 +1,9 @@
+node_modules
+.next
+data
+secrets/*.txt
+.env
+.env.*
+!.env.example
+.git
+*.md
