@@ -7,15 +7,15 @@ export default async function Home() {
   const session = await getSessionUser();
   if (!session) return null; // middleware guarantees this won't render unauthenticated
 
-  const locations = getDb()
-    .prepare("SELECT * FROM locations WHERE user_id = ? ORDER BY is_default DESC, created_at ASC")
-    .all(session.userId) as LocationRow[];
+  const location = getDb()
+    .prepare("SELECT * FROM locations WHERE user_id = ? ORDER BY created_at DESC LIMIT 1")
+    .get(session.userId) as LocationRow | undefined;
 
   return (
     <div className="min-h-dvh">
       <TopNav session={session} />
-      <main className="mx-auto max-w-5xl px-4 py-6 sm:px-6">
-        <Dashboard initialLocations={locations} />
+      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
+        <Dashboard initialLocation={location ?? null} />
       </main>
     </div>
   );

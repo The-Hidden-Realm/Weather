@@ -16,7 +16,7 @@ const DB_PATH = path.join(DATA_DIR, "weather.db");
 export const DEFAULT_ADMIN_PASSWORD = "ChangeMe123!";
 
 declare global {
-  // eslint-disable-next-line no-var
+   
   var __weatherDb: Database.Database | undefined;
 }
 
@@ -48,6 +48,16 @@ function ensureThemeColumn(db: Database.Database) {
   db.exec("ALTER TABLE users ADD COLUMN theme TEXT NOT NULL DEFAULT 'dark'");
 }
 
+function ensureLocationDetailColumns(db: Database.Database) {
+  const columns = db.prepare("PRAGMA table_info(locations)").all() as { name: string }[];
+  if (!columns.some((c) => c.name === "state")) {
+    db.exec("ALTER TABLE locations ADD COLUMN state TEXT NOT NULL DEFAULT ''");
+  }
+  if (!columns.some((c) => c.name === "zip")) {
+    db.exec("ALTER TABLE locations ADD COLUMN zip TEXT NOT NULL DEFAULT ''");
+  }
+}
+
 function init(): Database.Database {
   const db = new Database(DB_PATH);
   db.pragma("journal_mode = WAL");
@@ -67,6 +77,8 @@ function init(): Database.Database {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       label TEXT NOT NULL,
+      state TEXT NOT NULL DEFAULT '',
+      zip TEXT NOT NULL DEFAULT '',
       lat REAL NOT NULL,
       lon REAL NOT NULL,
       is_default INTEGER NOT NULL DEFAULT 0,
@@ -76,6 +88,7 @@ function init(): Database.Database {
 
   ensureMustChangePasswordColumn(db);
   ensureThemeColumn(db);
+  ensureLocationDetailColumns(db);
 
   const adminUsername = readSecret("ADMIN_USERNAME", "Admin")!;
   const existingAdmin = db
@@ -116,6 +129,8 @@ export type LocationRow = {
   id: number;
   user_id: number;
   label: string;
+  state: string;
+  zip: string;
   lat: number;
   lon: number;
   is_default: number;

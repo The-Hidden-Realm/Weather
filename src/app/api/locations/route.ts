@@ -7,38 +7,31 @@ export async function GET() {
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const rows = getDb()
-    .prepare("SELECT * FROM locations WHERE user_id = ? ORDER BY is_default DESC, created_at ASC")
+    .prepare("SELECT * FROM locations WHERE user_id = ? ORDER BY created_at ASC")
     .all(session.userId) as LocationRow[];
 
   return NextResponse.json({ locations: rows });
 }
 
+// Each account has exactly one saved location. Setting a new one replaces
+// whatever was there before rather than adding to a list.
 export async function POST(req: NextRequest) {
   const session = await getSessionUser();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { label, lat, lon, setDefault } = await req.json();
+  const { label, state, zip, lat, lon } = await req.json();
   if (!label || typeof lat !== "number" || typeof lon !== "number") {
     return NextResponse.json({ error: "label, lat, lon are required." }, { status: 400 });
   }
 
   const db = getDb();
-  const existingCount = (
-    db.prepare("SELECT COUNT(*) as c FROM locations WHERE user_id = ?").get(session.userId) as {
-      c: number;
-    }
-  ).c;
-  const shouldBeDefault = setDefault || existingCount === 0;
-
   const tx = db.transaction(() => {
-    if (shouldBeDefault) {
-      db.prepare("UPDATE locations SET is_default = 0 WHERE user_id = ?").run(session.userId);
-    }
+    db.prepare("DELETE FROM locations WHERE user_id = ?").run(session.userId);
     const info = db
       .prepare(
-        "INSERT INTO locations (user_id, label, lat, lon, is_default) VALUES (?, ?, ?, ?, ?)"
+        "INSERT INTO locations (user_id, label, state, zip, lat, lon, is_default) VALUES (?, ?, ?, ?, ?, ?, 1)"
       )
-      .run(session.userId, label, lat, lon, shouldBeDefault ? 1 : 0);
+      .run(session.userId, label, state || "", zip || "", lat, lon);
     return info.lastInsertRowid;
   });
 
