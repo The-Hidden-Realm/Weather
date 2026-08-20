@@ -13,7 +13,7 @@ export {
 
 export function findUserByUsername(username: string): UserRow | undefined {
   return getDb()
-    .prepare("SELECT * FROM users WHERE username = ?")
+    .prepare("SELECT * FROM users WHERE username = ? COLLATE NOCASE")
     .get(username) as UserRow | undefined;
 }
 
