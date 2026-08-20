@@ -24,15 +24,15 @@ export function SevenDayForecast({ daily, timezone }: { daily: DailyPoint[]; tim
                 <span className="text-sm font-semibold text-foreground">{formatTemp(d.tempMax)}</span>
                 <span className="text-xs text-muted">{formatTemp(d.tempMin)}</span>
               </div>
-              <span className="flex h-4 items-center gap-0.5 text-[11px] text-accent-2">
-                {d.precipitationProbability > 0 && (
-                  <>
-                    <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M12 2c4 5.5 7 9 7 12.5A7 7 0 0 1 5 14.5C5 11 8 7.5 12 2Z" />
-                    </svg>
-                    {d.precipitationProbability}%
-                  </>
-                )}
+              <span
+                className={`flex h-4 items-center gap-0.5 text-[11px] ${
+                  d.precipitationProbability > 0 ? "text-accent-2" : "text-muted/60"
+                }`}
+              >
+                <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 2c4 5.5 7 9 7 12.5A7 7 0 0 1 5 14.5C5 11 8 7.5 12 2Z" />
+                </svg>
+                {d.precipitationProbability}%
               </span>
             </div>
           );

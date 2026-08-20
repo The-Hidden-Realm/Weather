@@ -1,11 +1,11 @@
 import type { WeatherPayload } from "@/lib/weather/types";
 import { describeWeatherCode } from "@/lib/weather/wmo";
 import { WeatherIcon } from "@/components/WeatherIcon";
+import { SunriseSunsetTiles } from "@/components/SunriseSunsetTile";
 import {
   compassDirection,
   formatPressure,
   formatTemp,
-  formatTime,
   formatVisibility,
   formatWind,
 } from "@/lib/weather/format";
@@ -17,23 +17,16 @@ export function CurrentConditionsCard({ data }: { data: WeatherPayload }) {
   const stats: { label: string; value: string }[] = [
     { label: "Feels like", value: formatTemp(current.feelsLike) },
     { label: "Wind", value: `${formatWind(current.windSpeed)} ${compassDirection(current.windDirection)}` },
-    { label: "Gusts", value: current.windGust != null ? formatWind(current.windGust) : "—" },
     { label: "Humidity", value: `${Math.round(current.humidity)}%` },
     { label: "Visibility", value: formatVisibility(current.visibility) },
     { label: "Pressure", value: formatPressure(current.pressure) },
     { label: "Precipitation", value: current.precipitation > 0 ? `${current.precipitation.toFixed(2)} in` : "0 in" },
-    { label: "Cloud cover", value: `${Math.round(current.cloudCover)}%` },
-    { label: "Sunrise", value: data.sunrise ? formatTime(data.sunrise, location.timezone) : "—" },
-    { label: "Sunset", value: data.sunset ? formatTime(data.sunset, location.timezone) : "—" },
   ];
 
   return (
-    <div className="rounded-2xl border border-border bg-surface/70 p-5">
+    <div className="h-full rounded-2xl border border-border bg-surface/70 p-5">
       <div className="flex items-start justify-between">
-        <div>
-          <h2 className="text-sm font-medium text-muted">Current conditions</h2>
-          <p className="mt-0.5 text-lg font-semibold text-foreground">{location.label}</p>
-        </div>
+        <h2 className="text-sm font-medium text-muted">Current conditions</h2>
         <WeatherIcon icon={icon} className="h-14 w-14" />
       </div>
 
@@ -44,14 +37,22 @@ export function CurrentConditionsCard({ data }: { data: WeatherPayload }) {
         <span className="text-sm text-muted">{description}</span>
       </div>
 
-      <div className="mt-5 grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-5">
+      <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
         {stats.map((s) => (
-          <div key={s.label}>
+          <div key={s.label} className="rounded-xl border border-border/60 bg-surface-2/60 p-3">
             <p className="text-[11px] uppercase tracking-wide text-muted/80">{s.label}</p>
             <p className="text-sm font-medium text-foreground">{s.value}</p>
           </div>
         ))}
       </div>
+
+      {/* Sunrise/sunset live under the WIS card on large screens instead. */}
+      <SunriseSunsetTiles
+        sunrise={data.sunrise}
+        sunset={data.sunset}
+        timezone={location.timezone}
+        className="mt-3 lg:hidden"
+      />
     </div>
   );
 }

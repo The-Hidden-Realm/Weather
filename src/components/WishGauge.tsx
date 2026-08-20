@@ -20,8 +20,8 @@ export function WishGauge({ wish }: { wish: WishScore }) {
     <div className="rounded-2xl border border-border bg-surface/70 p-5">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-sm font-medium text-muted">WISH Score</h2>
-          <p className="text-xs text-muted/70">Weather Intensity Score for Here</p>
+          <h2 className="text-sm font-medium text-muted">WIS Score</h2>
+          <p className="text-xs text-muted/70">Weather Intensity Score</p>
         </div>
         <button
           onClick={() => setOpen((o) => !o)}

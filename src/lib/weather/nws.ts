@@ -21,8 +21,12 @@ export async function fetchNwsAlerts(lat: number, lon: number): Promise<{ alerts
       properties: {
         event: string;
         headline: string;
+        description: string;
+        instruction: string | null;
         severity: string;
         urgency: string;
+        certainty: string;
+        senderName: string;
         areaDesc: string;
         effective: string;
         expires: string;
@@ -32,8 +36,12 @@ export async function fetchNwsAlerts(lat: number, lon: number): Promise<{ alerts
       id: f.id,
       event: f.properties.event,
       headline: f.properties.headline,
+      description: f.properties.description || "",
+      instruction: f.properties.instruction || "",
       severity: f.properties.severity,
       urgency: f.properties.urgency,
+      certainty: f.properties.certainty,
+      senderName: f.properties.senderName,
       areaDesc: f.properties.areaDesc,
       effective: f.properties.effective,
       expires: f.properties.expires,

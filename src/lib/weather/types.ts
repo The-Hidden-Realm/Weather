@@ -45,8 +45,12 @@ export type NwsAlert = {
   id: string;
   event: string;
   headline: string;
+  description: string;
+  instruction: string;
   severity: string;
   urgency: string;
+  certainty: string;
+  senderName: string;
   areaDesc: string;
   effective: string;
   expires: string;

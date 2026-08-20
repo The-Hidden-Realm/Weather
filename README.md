@@ -16,13 +16,17 @@ Data comes from [Open-Meteo](https://open-meteo.com/) (current conditions,
   seeded automatically on first boot; anyone else can self-serve sign up.
   Signing in with the default admin password forces a password change
   before the dashboard is reachable.
-- Each user saves their own location(s) — search by city, or use the
-  browser's geolocation. Weather is pulled for whichever location is selected.
-- Homepage: WISH score gauge, current conditions (feels like, wind,
-  humidity, visibility, pressure, precipitation, cloud cover, sunrise/sunset),
-  a 12-hour forecast strip, and a 7-day forecast — all with weather icons.
-- Active NWS alerts (e.g. Heat Advisory, Winter Storm Warning) surface as a
-  banner when present.
+- Each user has one saved location — search by city/state, or use the
+  browser's geolocation; picking a new one replaces the old. The location
+  title shows city, state, and zip (reverse-geocoded via BigDataCloud's free
+  API, since neither Open-Meteo nor NWS return postal codes).
+- Homepage: current conditions + WISH score on the left, a 12-hour forecast
+  alongside them on the right, and a 7-day forecast underneath — all with
+  weather icons, using the full width on wider screens.
+- Active NWS alerts (e.g. Heat Advisory, Winter Storm Warning) live behind
+  the bell icon in the top nav, polled every 5 minutes; a new alert shows an
+  unread dot and plays a short chime (browser autoplay rules may require one
+  prior click on the page before sound is allowed to play).
 - `/admin` — visible only to the admin role — lists all accounts on the
   instance.
 - The "Logged in as" menu in the top nav links to `/settings`, where anyone
