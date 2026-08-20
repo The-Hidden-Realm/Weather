@@ -15,6 +15,9 @@ export type SessionPayload = {
   role: "admin" | "user";
   mustChangePassword: boolean;
   theme: "dark" | "light";
+  // null = follow the current location's timezone instead of a fixed one.
+  timezone: string | null;
+  timeFormat: "12h" | "24h";
 };
 
 export async function createSessionToken(payload: SessionPayload): Promise<string> {
@@ -39,6 +42,8 @@ export async function verifySessionToken(token: string): Promise<SessionPayload 
         role: payload.role,
         mustChangePassword: payload.mustChangePassword === true,
         theme: payload.theme === "light" ? "light" : "dark",
+        timezone: typeof payload.timezone === "string" ? payload.timezone : null,
+        timeFormat: payload.timeFormat === "24h" ? "24h" : "12h",
       };
     }
     return null;

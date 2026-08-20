@@ -5,10 +5,21 @@ import {
   findUserByUsername,
   updateUsername,
   updateTheme,
+  updateTimezone,
+  updateTimeFormat,
   setSessionCookie,
 } from "@/lib/auth";
 
 const USERNAME_RE = /^[a-zA-Z0-9_.-]{3,32}$/;
+
+function isValidTimeZone(tz: string): boolean {
+  try {
+    new Intl.DateTimeFormat(undefined, { timeZone: tz });
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 export async function PATCH(req: NextRequest) {
   const session = await getSessionUser();
@@ -44,13 +55,34 @@ export async function PATCH(req: NextRequest) {
     theme = body.theme;
   }
 
+  let timezone = user.timezone;
+  if ("timezone" in body) {
+    if (body.timezone === null) {
+      updateTimezone(user.id, null);
+      timezone = null;
+    } else if (typeof body.timezone === "string" && isValidTimeZone(body.timezone)) {
+      updateTimezone(user.id, body.timezone);
+      timezone = body.timezone;
+    } else {
+      return NextResponse.json({ error: "That timezone isn't recognized." }, { status: 400 });
+    }
+  }
+
+  let timeFormat = user.time_format;
+  if (body.timeFormat === "12h" || body.timeFormat === "24h") {
+    updateTimeFormat(user.id, body.timeFormat);
+    timeFormat = body.timeFormat;
+  }
+
   await setSessionCookie({
     userId: user.id,
     username,
     role: user.role,
     mustChangePassword: user.must_change_password === 1,
     theme,
+    timezone,
+    timeFormat,
   });
 
-  return NextResponse.json({ ok: true, username, theme });
+  return NextResponse.json({ ok: true, username, theme, timezone, timeFormat });
 }

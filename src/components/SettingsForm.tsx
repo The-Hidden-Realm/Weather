@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { SessionPayload } from "@/lib/session";
 
@@ -34,6 +34,8 @@ export function SettingsForm({ session }: { session: SessionPayload }) {
       <UsernameCard initialUsername={session.username} />
       <PasswordCard />
       <ThemeCard initialTheme={session.theme} onChanged={() => router.refresh()} />
+      <TimezoneCard initialTimezone={session.timezone} onChanged={() => router.refresh()} />
+      <ClockFormatCard initialFormat={session.timeFormat} onChanged={() => router.refresh()} />
     </div>
   );
 }
@@ -207,6 +209,215 @@ function ThemeCard({ initialTheme, onChanged }: { initialTheme: "dark" | "light"
           <div className="h-14 w-full rounded-lg border border-border/60 bg-[#f4f7fc] p-2">
             <div className="h-2 w-8 rounded-full bg-[#2563eb]" />
             <div className="mt-2 h-2 w-14 rounded-full bg-[#dbe3ef]" />
+          </div>
+        </ThemeOption>
+      </div>
+    </Card>
+  );
+}
+
+const TIMEZONES: string[] =
+  typeof Intl.supportedValuesOf === "function" ? Intl.supportedValuesOf("timeZone") : [];
+
+const AUTOMATIC_LABEL = "Automatic (use location’s timezone)";
+
+// Common US-style names people actually search for ("eastern", "pacific"...)
+// rather than the IANA city names those zones are keyed by underneath.
+const TIMEZONE_ALIASES: { label: string; tz: string; keywords: string[] }[] = [
+  { label: "Eastern Time", tz: "America/New_York", keywords: ["eastern", "et", "est", "edt"] },
+  { label: "Central Time", tz: "America/Chicago", keywords: ["central", "ct", "cst", "cdt"] },
+  { label: "Mountain Time", tz: "America/Denver", keywords: ["mountain", "mt", "mst", "mdt"] },
+  { label: "Arizona Time (no DST)", tz: "America/Phoenix", keywords: ["arizona"] },
+  { label: "Pacific Time", tz: "America/Los_Angeles", keywords: ["pacific", "pt", "pst", "pdt"] },
+  { label: "Alaska Time", tz: "America/Anchorage", keywords: ["alaska", "akst", "akdt"] },
+  { label: "Hawaii Time", tz: "Pacific/Honolulu", keywords: ["hawaii", "hst"] },
+  { label: "Atlantic Time", tz: "America/Puerto_Rico", keywords: ["atlantic", "ast"] },
+];
+const ALIAS_TZ_SET = new Set(TIMEZONE_ALIASES.map((a) => a.tz));
+
+function timezoneLabel(tz: string): string {
+  if (tz === "") return AUTOMATIC_LABEL;
+  const alias = TIMEZONE_ALIASES.find((a) => a.tz === tz);
+  return alias ? `${alias.label} (${tz.replace(/_/g, " ")})` : tz.replace(/_/g, " ");
+}
+
+function TimezoneCard({
+  initialTimezone,
+  onChanged,
+}: {
+  initialTimezone: string | null;
+  onChanged: () => void;
+}) {
+  const [timezone, setTimezone] = useState(initialTimezone ?? "");
+  const [query, setQuery] = useState(timezoneLabel(initialTimezone ?? ""));
+  const [open, setOpen] = useState(false);
+  const [message, setMessage] = useState<{ text: string; kind: "error" | "success" } | null>(null);
+  const [loading, setLoading] = useState(false);
+  const boxRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function onClickOutside(e: MouseEvent) {
+      if (boxRef.current && !boxRef.current.contains(e.target as Node)) {
+        setOpen(false);
+        setQuery(timezoneLabel(timezone));
+      }
+    }
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, [timezone]);
+
+  const needle = query.trim().toLowerCase();
+  const aliasMatches = needle
+    ? TIMEZONE_ALIASES.filter(
+        (a) => a.label.toLowerCase().includes(needle) || a.keywords.some((k) => k.includes(needle))
+      )
+    : TIMEZONE_ALIASES;
+  const matches = (
+    needle
+      ? TIMEZONES.filter((tz) => tz.replace(/_/g, " ").toLowerCase().includes(needle))
+      : TIMEZONES
+  )
+    .filter((tz) => !ALIAS_TZ_SET.has(tz))
+    .slice(0, 50);
+  const showAutomatic = !needle || AUTOMATIC_LABEL.toLowerCase().includes(needle);
+
+  async function selectTimezone(next: string) {
+    setTimezone(next);
+    setQuery(timezoneLabel(next));
+    setOpen(false);
+    setMessage(null);
+    setLoading(true);
+    try {
+      const res = await fetch("/api/account", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ timezone: next || null }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setMessage({ text: data.error || "Couldn't update timezone.", kind: "error" });
+        return;
+      }
+      onChanged();
+    } catch {
+      setMessage({ text: "Something went wrong. Try again.", kind: "error" });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <Card
+      title="Timezone"
+      description="Times across the dashboard use your saved location's timezone unless you fix one here."
+    >
+      <div ref={boxRef} className="relative">
+        <input
+          value={query}
+          disabled={loading}
+          onFocus={(e) => {
+            setOpen(true);
+            e.target.select();
+          }}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setOpen(true);
+          }}
+          placeholder="Search for a timezone…"
+          className="w-full rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm text-foreground outline-none focus:border-accent focus:ring-2 focus:ring-accent/30 disabled:opacity-60"
+        />
+
+        {open && (
+          <div className="absolute left-0 right-0 z-20 mt-1 max-h-64 overflow-y-auto rounded-lg border border-border bg-surface-2 shadow-xl">
+            {showAutomatic && (
+              <button
+                type="button"
+                onClick={() => selectTimezone("")}
+                className={`block w-full px-3 py-2 text-left text-sm hover:bg-accent/10 ${
+                  timezone === "" ? "text-accent-2" : "text-foreground"
+                }`}
+              >
+                {AUTOMATIC_LABEL}
+              </button>
+            )}
+            {aliasMatches.map((a) => (
+              <button
+                key={a.tz}
+                type="button"
+                onClick={() => selectTimezone(a.tz)}
+                className={`block w-full px-3 py-2 text-left text-sm hover:bg-accent/10 ${
+                  timezone === a.tz ? "text-accent-2" : "text-foreground"
+                }`}
+              >
+                {a.label}
+                <span className="ml-1.5 text-xs text-muted">{a.tz.replace(/_/g, " ")}</span>
+              </button>
+            ))}
+            {aliasMatches.length > 0 && matches.length > 0 && (
+              <div className="border-t border-border" />
+            )}
+            {matches.map((tz) => (
+              <button
+                key={tz}
+                type="button"
+                onClick={() => selectTimezone(tz)}
+                className={`block w-full px-3 py-2 text-left text-sm hover:bg-accent/10 ${
+                  timezone === tz ? "text-accent-2" : "text-foreground"
+                }`}
+              >
+                {timezoneLabel(tz)}
+              </button>
+            ))}
+            {!showAutomatic && aliasMatches.length === 0 && matches.length === 0 && (
+              <p className="px-3 py-2 text-sm text-muted">No matching timezone.</p>
+            )}
+          </div>
+        )}
+      </div>
+      {message && <Message {...message} />}
+    </Card>
+  );
+}
+
+function ClockFormatCard({
+  initialFormat,
+  onChanged,
+}: {
+  initialFormat: "12h" | "24h";
+  onChanged: () => void;
+}) {
+  const [format, setFormat] = useState(initialFormat);
+  const [loading, setLoading] = useState(false);
+
+  async function selectFormat(next: "12h" | "24h") {
+    if (next === format || loading) return;
+    setLoading(true);
+    try {
+      const res = await fetch("/api/account", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ timeFormat: next }),
+      });
+      if (res.ok) {
+        setFormat(next);
+        onChanged();
+      }
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <Card title="Clock format" description="Choose how times are displayed across the dashboard.">
+      <div className="flex gap-3">
+        <ThemeOption label="12-hour" active={format === "12h"} onClick={() => selectFormat("12h")}>
+          <div className="flex h-14 w-full items-center justify-center rounded-lg border border-border/60 bg-surface-2 text-sm text-foreground">
+            1:00 PM
+          </div>
+        </ThemeOption>
+        <ThemeOption label="24-hour" active={format === "24h"} onClick={() => selectFormat("24h")}>
+          <div className="flex h-14 w-full items-center justify-center rounded-lg border border-border/60 bg-surface-2 text-sm text-foreground">
+            13:00
           </div>
         </ThemeOption>
       </div>

@@ -2,18 +2,20 @@ export function formatTemp(value: number): string {
   return `${Math.round(value)}°`;
 }
 
-export function formatTime(iso: string, timezone: string): string {
+export function formatTime(iso: string, timezone: string, hour12 = true): string {
   return new Date(iso).toLocaleTimeString("en-US", {
     hour: "numeric",
     minute: "2-digit",
     timeZone: timezone,
+    hour12,
   });
 }
 
-export function formatHour(iso: string, timezone: string): string {
+export function formatHour(iso: string, timezone: string, hour12 = true): string {
   return new Date(iso).toLocaleTimeString("en-US", {
     hour: "numeric",
     timeZone: timezone,
+    hour12,
   });
 }
 

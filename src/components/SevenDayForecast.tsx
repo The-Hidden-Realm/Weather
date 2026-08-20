@@ -11,10 +11,12 @@ export function SevenDayForecast({
   daily,
   hourly,
   timezone,
+  hour12 = true,
 }: {
   daily: DailyPoint[];
   hourly: HourlyPoint[];
   timezone: string;
+  hour12?: boolean;
 }) {
   const [selected, setSelected] = useState<{ day: DailyPoint; label: string } | null>(null);
 
@@ -60,6 +62,7 @@ export function SevenDayForecast({
           dayLabel={selected.label}
           hourly={hourly.filter((h) => h.time.startsWith(selected.day.date))}
           timezone={timezone}
+          hour12={hour12}
           onClose={() => setSelected(null)}
         />
       )}

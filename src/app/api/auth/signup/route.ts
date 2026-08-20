@@ -36,6 +36,8 @@ export async function POST(req: NextRequest) {
     role: user.role,
     mustChangePassword: false,
     theme: user.theme,
+    timezone: user.timezone,
+    timeFormat: user.time_format,
   });
 
   return NextResponse.json({ ok: true, role: user.role });

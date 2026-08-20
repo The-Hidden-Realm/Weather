@@ -17,6 +17,8 @@ export function LocationHeader({
   lastUpdated?: {
     fetchedAt: string;
     timezone: string;
+    hour12?: boolean;
+    exact?: boolean;
     isAdmin: boolean;
     onRefresh: () => void;
     refreshing: boolean;
@@ -103,6 +105,8 @@ export function LocationHeader({
           <LastUpdated
             fetchedAt={lastUpdated.fetchedAt}
             timezone={lastUpdated.timezone}
+            hour12={lastUpdated.hour12}
+            exact={lastUpdated.exact}
             isAdmin={lastUpdated.isAdmin}
             onRefresh={lastUpdated.onRefresh}
             refreshing={lastUpdated.refreshing}

@@ -1,9 +1,9 @@
-import { getSessionUser } from "@/lib/auth";
+import { getActiveSessionUser } from "@/lib/auth";
 import { TopNav } from "@/components/TopNav";
 import { SettingsForm } from "@/components/SettingsForm";
 
 export default async function SettingsPage() {
-  const session = await getSessionUser();
+  const session = await getActiveSessionUser();
   if (!session) return null; // proxy guarantees this won't render unauthenticated
 
   return (
