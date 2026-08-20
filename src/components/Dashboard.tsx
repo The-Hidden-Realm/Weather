@@ -106,14 +106,16 @@ export function Dashboard({ initialLocation }: { initialLocation: SavedLocation 
             <CurrentConditionsCard data={weather} />
           </div>
 
-          <div className="min-w-0 flex flex-col lg:col-start-2 lg:row-start-1">
+          <div className="min-w-0 flex h-full flex-col lg:col-start-2 lg:row-start-1">
             <WishGauge wish={weather.wish} />
-            <SunriseSunsetTiles
-              sunrise={weather.sunrise}
-              sunset={weather.sunset}
-              timezone={weather.location.timezone}
-              className="hidden lg:grid"
-            />
+            <div className="hidden flex-1 lg:flex lg:items-center">
+              <SunriseSunsetTiles
+                sunrise={weather.sunrise}
+                sunset={weather.sunset}
+                timezone={weather.location.timezone}
+                className="w-full"
+              />
+            </div>
           </div>
 
           <div className="min-w-0 lg:col-start-3 lg:row-start-1 lg:row-span-2">

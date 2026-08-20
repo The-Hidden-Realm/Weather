@@ -24,7 +24,7 @@ export function CurrentConditionsCard({ data }: { data: WeatherPayload }) {
   ];
 
   return (
-    <div className="rounded-2xl border border-border bg-surface/70 p-5">
+    <div className="h-full rounded-2xl border border-border bg-surface/70 p-5">
       <div className="flex items-start justify-between">
         <h2 className="text-sm font-medium text-muted">Current conditions</h2>
         <WeatherIcon icon={icon} className="h-14 w-14" />
