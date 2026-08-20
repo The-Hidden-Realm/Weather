@@ -3,7 +3,7 @@ import { SESSION_COOKIE_NAME, verifySessionToken } from "@/lib/session";
 
 const PUBLIC_PATHS = ["/login", "/signup"];
 
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   if (

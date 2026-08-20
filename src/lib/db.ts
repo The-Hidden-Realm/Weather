@@ -5,7 +5,7 @@ import path from "node:path";
 import { readSecret } from "@/lib/secrets";
 
 const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), "data");
-if (!fs.existsSync(DATA_DIR)) {
+if (!fs.existsSync(/* turbopackIgnore: true */ DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
 }
 

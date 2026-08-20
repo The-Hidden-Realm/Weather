@@ -1,36 +1,83 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Wisp Weather
 
-## Getting Started
+A dark-themed weather dashboard with a custom **WISH score** (Weather Intensity
+Score for Here) — a 0-100 read on how "in your face" the weather is right now,
+blending wind, precipitation, temperature extremity, visibility, storm
+activity, and active NWS alerts.
 
-First, run the development server:
+Data comes from [Open-Meteo](https://open-meteo.com/) (current conditions,
+12-hour and 7-day forecasts — no API key required) and the
+[National Weather Service](https://www.weather.gov/documentation/services-web-api)
+(active alerts, US locations only).
+
+## Features
+
+- Email/password accounts. An `Admin` account is seeded automatically on
+  first boot; anyone else can self-serve sign up.
+- Each user saves their own location(s) — search by city, or use the
+  browser's geolocation. Weather is pulled for whichever location is selected.
+- Homepage: WISH score gauge, current conditions (feels like, wind,
+  humidity, visibility, pressure, precipitation, cloud cover, sunrise/sunset),
+  a 12-hour forecast strip, and a 7-day forecast — all with weather icons.
+- Active NWS alerts (e.g. Heat Advisory, Winter Storm Warning) surface as a
+  banner when present.
+- `/admin` — visible only to the admin role — lists all accounts on the
+  instance.
+
+## Running with Docker (recommended)
+
+1. Copy the example env file and secret, then fill in real values:
+
+   ```bash
+   cp .env.example .env
+   cp secrets/admin_password.txt.example secrets/admin_password.txt
+   ```
+
+   - `SESSION_SECRET` in `.env` signs login sessions — generate one with
+     `openssl rand -base64 32`.
+   - `secrets/admin_password.txt` is the initial password for the `Admin`
+     account, mounted into the container as a Docker secret (never baked
+     into the image). Change it from the placeholder.
+
+2. Build and start:
+
+   ```bash
+   docker compose up --build
+   ```
+
+3. Open [http://localhost:3000](http://localhost:3000) and sign in as
+   `Admin` with the password you set.
+
+Weather data lives in SQLite inside a named Docker volume
+(`weather-data`), so accounts and saved locations persist across restarts
+and rebuilds.
+
+## Local development (without Docker)
 
 ```bash
+npm install
+cp .env.example .env   # set SESSION_SECRET
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Without `ADMIN_PASSWORD` (or `ADMIN_PASSWORD_FILE`) set, the seeded admin
+password defaults to `ChangeMe123!` — fine for local dev, not for anything
+exposed beyond your machine.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Environment variables
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Variable              | Purpose                                                              |
+| ---------------------- | --------------------------------------------------------------------- |
+| `SESSION_SECRET`       | Signs session cookies. Required.                                     |
+| `ADMIN_USERNAME`       | Seeded admin's username. Defaults to `Admin`.                        |
+| `ADMIN_PASSWORD`       | Seeded admin's password (or use `ADMIN_PASSWORD_FILE` for a secret). |
+| `CONTACT_EMAIL`        | Optional — identifies this app to api.weather.gov per NWS etiquette. |
+| `DATA_DIR`             | Where the SQLite file lives. Defaults to `./data`.                   |
 
-## Learn More
+Any `<VAR>_FILE` variable (e.g. `ADMIN_PASSWORD_FILE`) reads the value from
+a file instead — the pattern Docker/Compose secrets use.
 
-To learn more about Next.js, take a look at the following resources:
+## Tech
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Next.js (App Router) + TypeScript + Tailwind, SQLite via `better-sqlite3`,
+JWT session cookies via `jose`, bcrypt password hashing.

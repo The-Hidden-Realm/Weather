@@ -1,5 +1,5 @@
 # --- Dependencies & build ---------------------------------------------
-FROM node:20-bookworm-slim AS builder
+FROM node:22-bookworm-slim AS builder
 WORKDIR /app
 
 # better-sqlite3 needs to compile its native addon
@@ -14,7 +14,7 @@ COPY . .
 RUN npm run build
 
 # --- Runtime -------------------------------------------------------------
-FROM node:20-bookworm-slim AS runner
+FROM node:22-bookworm-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV DATA_DIR=/app/data
