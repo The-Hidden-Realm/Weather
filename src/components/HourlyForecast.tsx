@@ -1,7 +1,7 @@
 import type { HourlyPoint } from "@/lib/weather/types";
 import { describeWeatherCode } from "@/lib/weather/wmo";
 import { WeatherIcon } from "@/components/WeatherIcon";
-import { formatHour, formatTemp } from "@/lib/weather/format";
+import { formatTime, formatTemp } from "@/lib/weather/format";
 
 export function HourlyForecast({
   hourly,
@@ -20,8 +20,8 @@ export function HourlyForecast({
           const { icon } = describeWeatherCode(h.weatherCode, h.isDay);
           return (
             <div key={h.time} className="flex items-center gap-3 py-2.5">
-              <span className="w-12 shrink-0 text-xs text-muted">
-                {i === 0 ? "Now" : formatHour(h.time, timezone, hour12)}
+              <span className="w-16 shrink-0 text-xs text-muted">
+                {i === 0 ? "Now" : formatTime(h.time, timezone, hour12)}
               </span>
               <WeatherIcon icon={icon} className="h-7 w-7 shrink-0" />
               <span className="w-10 flex-1 text-sm font-semibold text-foreground">

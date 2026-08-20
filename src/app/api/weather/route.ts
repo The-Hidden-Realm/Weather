@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
     ]);
 
     const today = forecast.daily[0];
-    const wish = computeWishScore(forecast.current, today, nws.alerts);
+    const wish = computeWishScore(forecast.current, today, nws.alerts, forecast.hourly, nws.ok);
 
     const payload: WeatherPayload = {
       location: { label, lat, lon, timezone: forecast.timezone },
