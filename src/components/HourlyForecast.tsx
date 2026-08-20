@@ -3,7 +3,15 @@ import { describeWeatherCode } from "@/lib/weather/wmo";
 import { WeatherIcon } from "@/components/WeatherIcon";
 import { formatHour, formatTemp } from "@/lib/weather/format";
 
-export function HourlyForecast({ hourly, timezone }: { hourly: HourlyPoint[]; timezone: string }) {
+export function HourlyForecast({
+  hourly,
+  timezone,
+  hour12 = true,
+}: {
+  hourly: HourlyPoint[];
+  timezone: string;
+  hour12?: boolean;
+}) {
   return (
     <div className="flex h-full flex-col rounded-2xl border border-border bg-surface/70 p-5">
       <h2 className="mb-3 text-sm font-medium text-muted">Next 12 hours</h2>
@@ -13,7 +21,7 @@ export function HourlyForecast({ hourly, timezone }: { hourly: HourlyPoint[]; ti
           return (
             <div key={h.time} className="flex items-center gap-3 py-2.5">
               <span className="w-12 shrink-0 text-xs text-muted">
-                {i === 0 ? "Now" : formatHour(h.time, timezone)}
+                {i === 0 ? "Now" : formatHour(h.time, timezone, hour12)}
               </span>
               <WeatherIcon icon={icon} className="h-7 w-7 shrink-0" />
               <span className="w-10 flex-1 text-sm font-semibold text-foreground">

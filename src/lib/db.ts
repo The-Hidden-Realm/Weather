@@ -58,9 +58,31 @@ function ensureLocationDetailColumns(db: Database.Database) {
   }
 }
 
+function ensureUserPreferenceColumns(db: Database.Database) {
+  const columns = db.prepare("PRAGMA table_info(users)").all() as { name: string }[];
+  // NULL timezone means "follow the current location's timezone".
+  if (!columns.some((c) => c.name === "timezone")) {
+    db.exec("ALTER TABLE users ADD COLUMN timezone TEXT");
+  }
+  if (!columns.some((c) => c.name === "time_format")) {
+    db.exec("ALTER TABLE users ADD COLUMN time_format TEXT NOT NULL DEFAULT '12h'");
+  }
+}
+
+function ensureAdminControlColumns(db: Database.Database) {
+  const columns = db.prepare("PRAGMA table_info(users)").all() as { name: string }[];
+  if (!columns.some((c) => c.name === "is_active")) {
+    db.exec("ALTER TABLE users ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1");
+  }
+  if (!columns.some((c) => c.name === "last_login")) {
+    db.exec("ALTER TABLE users ADD COLUMN last_login TEXT");
+  }
+}
+
 function init(): Database.Database {
   const db = new Database(DB_PATH);
   db.pragma("journal_mode = WAL");
+  db.pragma("foreign_keys = ON");
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS users (
@@ -89,6 +111,8 @@ function init(): Database.Database {
   ensureMustChangePasswordColumn(db);
   ensureThemeColumn(db);
   ensureLocationDetailColumns(db);
+  ensureUserPreferenceColumns(db);
+  ensureAdminControlColumns(db);
 
   const adminUsername = readSecret("ADMIN_USERNAME", "Admin")!;
   const existingAdmin = db
@@ -122,6 +146,10 @@ export type UserRow = {
   role: "admin" | "user";
   must_change_password: number;
   theme: "dark" | "light";
+  timezone: string | null;
+  time_format: "12h" | "24h";
+  is_active: number;
+  last_login: string | null;
   created_at: string;
 };
 

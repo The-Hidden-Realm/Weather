@@ -11,12 +11,14 @@ export function DayDetailModal({
   dayLabel,
   hourly,
   timezone,
+  hour12 = true,
   onClose,
 }: {
   day: DailyPoint;
   dayLabel: string;
   hourly: HourlyPoint[];
   timezone: string;
+  hour12?: boolean;
   onClose: () => void;
 }) {
   useEffect(() => {
@@ -100,7 +102,7 @@ export function DayDetailModal({
             const { icon: hourIcon } = describeWeatherCode(h.weatherCode, h.isDay);
             return (
               <div key={h.time} className="flex items-center gap-3 py-2.5">
-                <span className="w-14 shrink-0 text-xs text-muted">{formatHour(h.time, timezone)}</span>
+                <span className="w-14 shrink-0 text-xs text-muted">{formatHour(h.time, timezone, hour12)}</span>
                 <WeatherIcon icon={hourIcon} className="h-7 w-7 shrink-0" />
                 <span className="w-10 flex-1 text-sm font-semibold text-foreground">
                   {formatTemp(h.temperature)}

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { findUserByUsername, verifyPassword, setSessionCookie } from "@/lib/auth";
+import { findUserByUsername, verifyPassword, setSessionCookie, recordLogin } from "@/lib/auth";
 
 export async function POST(req: NextRequest) {
   const { username, password } = await req.json();
@@ -13,12 +13,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid username or password." }, { status: 401 });
   }
 
+  if (user.is_active === 0) {
+    return NextResponse.json({ error: "This account has been deactivated." }, { status: 403 });
+  }
+
+  recordLogin(user.id);
+
   await setSessionCookie({
     userId: user.id,
     username: user.username,
     role: user.role,
     mustChangePassword: user.must_change_password === 1,
     theme: user.theme,
+    timezone: user.timezone,
+    timeFormat: user.time_format,
   });
 
   return NextResponse.json({ ok: true, role: user.role, mustChangePassword: user.must_change_password === 1 });

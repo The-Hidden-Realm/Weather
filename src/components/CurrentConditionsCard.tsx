@@ -10,8 +10,16 @@ import {
   formatWind,
 } from "@/lib/weather/format";
 
-export function CurrentConditionsCard({ data }: { data: WeatherPayload }) {
-  const { current, location } = data;
+export function CurrentConditionsCard({
+  data,
+  timezone,
+  hour12 = true,
+}: {
+  data: WeatherPayload;
+  timezone: string;
+  hour12?: boolean;
+}) {
+  const { current } = data;
   const { description, icon } = describeWeatherCode(current.weatherCode, current.isDay);
 
   const stats: { label: string; value: string }[] = [
@@ -50,7 +58,8 @@ export function CurrentConditionsCard({ data }: { data: WeatherPayload }) {
       <SunriseSunsetTiles
         sunrise={data.sunrise}
         sunset={data.sunset}
-        timezone={location.timezone}
+        timezone={timezone}
+        hour12={hour12}
         className="mt-3 lg:hidden"
       />
     </div>
