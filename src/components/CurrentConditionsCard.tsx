@@ -17,12 +17,10 @@ export function CurrentConditionsCard({ data }: { data: WeatherPayload }) {
   const stats: { label: string; value: string }[] = [
     { label: "Feels like", value: formatTemp(current.feelsLike) },
     { label: "Wind", value: `${formatWind(current.windSpeed)} ${compassDirection(current.windDirection)}` },
-    { label: "Gusts", value: current.windGust != null ? formatWind(current.windGust) : "—" },
     { label: "Humidity", value: `${Math.round(current.humidity)}%` },
     { label: "Visibility", value: formatVisibility(current.visibility) },
     { label: "Pressure", value: formatPressure(current.pressure) },
     { label: "Precipitation", value: current.precipitation > 0 ? `${current.precipitation.toFixed(2)} in` : "0 in" },
-    { label: "Cloud cover", value: `${Math.round(current.cloudCover)}%` },
   ];
 
   return (
