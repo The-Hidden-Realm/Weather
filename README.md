@@ -25,6 +25,9 @@ Data comes from [Open-Meteo](https://open-meteo.com/) (current conditions,
   banner when present.
 - `/admin` — visible only to the admin role — lists all accounts on the
   instance.
+- The "Logged in as" menu in the top nav links to `/settings`, where anyone
+  can change their own username and password, and switch between dark and
+  light theme (a per-account preference, dark by default).
 
 ## Running with Docker (recommended)
 

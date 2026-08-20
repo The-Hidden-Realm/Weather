@@ -42,6 +42,12 @@ function ensureMustChangePasswordColumn(db: Database.Database) {
   }
 }
 
+function ensureThemeColumn(db: Database.Database) {
+  const columns = db.prepare("PRAGMA table_info(users)").all() as { name: string }[];
+  if (columns.some((c) => c.name === "theme")) return;
+  db.exec("ALTER TABLE users ADD COLUMN theme TEXT NOT NULL DEFAULT 'dark'");
+}
+
 function init(): Database.Database {
   const db = new Database(DB_PATH);
   db.pragma("journal_mode = WAL");
@@ -53,6 +59,7 @@ function init(): Database.Database {
       password_hash TEXT NOT NULL,
       role TEXT NOT NULL DEFAULT 'user',
       must_change_password INTEGER NOT NULL DEFAULT 0,
+      theme TEXT NOT NULL DEFAULT 'dark',
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
@@ -68,6 +75,7 @@ function init(): Database.Database {
   `);
 
   ensureMustChangePasswordColumn(db);
+  ensureThemeColumn(db);
 
   const adminUsername = readSecret("ADMIN_USERNAME", "Admin")!;
   const existingAdmin = db
@@ -100,6 +108,7 @@ export type UserRow = {
   password_hash: string;
   role: "admin" | "user";
   must_change_password: number;
+  theme: "dark" | "light";
   created_at: string;
 };
 

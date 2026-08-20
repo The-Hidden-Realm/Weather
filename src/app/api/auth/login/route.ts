@@ -18,6 +18,7 @@ export async function POST(req: NextRequest) {
     username: user.username,
     role: user.role,
     mustChangePassword: user.must_change_password === 1,
+    theme: user.theme,
   });
 
   return NextResponse.json({ ok: true, role: user.role, mustChangePassword: user.must_change_password === 1 });

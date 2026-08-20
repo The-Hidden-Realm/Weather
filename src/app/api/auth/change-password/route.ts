@@ -29,6 +29,7 @@ export async function POST(req: NextRequest) {
     username: user.username,
     role: user.role,
     mustChangePassword: false,
+    theme: user.theme,
   });
 
   return NextResponse.json({ ok: true });

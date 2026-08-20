@@ -15,6 +15,21 @@
   --warn: #fbbf24;
 }
 
+:root[data-theme="light"] {
+  --background: #f4f7fc;
+  --surface: #ffffff;
+  --surface-2: #eef2f9;
+  --border: #dbe3ef;
+  --foreground: #101828;
+  --muted: #5b6b84;
+  --accent: #2563eb;
+  --accent-2: #3b82f6;
+  --accent-soft: rgba(37, 99, 235, 0.12);
+  --danger: #dc2626;
+  --good: #059669;
+  --warn: #d97706;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-surface: var(--surface);
@@ -37,6 +52,10 @@
 
 html {
   color-scheme: dark;
+}
+
+html[data-theme="light"] {
+  color-scheme: light;
 }
 
 body {
