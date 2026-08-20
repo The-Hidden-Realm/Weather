@@ -32,6 +32,7 @@ export async function GET(req: NextRequest) {
       sunrise: today?.sunrise ?? "",
       sunset: today?.sunset ?? "",
       source: { openMeteo: true, nws: nws.ok },
+      fetchedAt: new Date().toISOString(),
     };
 
     return NextResponse.json(payload);

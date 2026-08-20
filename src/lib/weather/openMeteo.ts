@@ -131,6 +131,8 @@ export async function fetchOpenMeteoForecast(
     uvIndex: raw.hourly.uv_index[nowIndex] ?? null,
   };
 
+  // Keep the full remaining horizon (not just the next 12h) so the 7-day
+  // tiles can show hourly detail for any day, not only the current one.
   const hourly: HourlyPoint[] = raw.hourly.time
     .map((time, i) => ({
       time,
@@ -143,7 +145,7 @@ export async function fetchOpenMeteoForecast(
       windSpeed: raw.hourly.wind_speed_10m[i],
       humidity: raw.hourly.relative_humidity_2m[i],
     }))
-    .slice(nowIndex, nowIndex + 12);
+    .slice(nowIndex);
 
   const daily: DailyPoint[] = raw.daily.time.map((date, i) => ({
     date,
