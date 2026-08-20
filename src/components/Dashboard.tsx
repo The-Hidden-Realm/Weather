@@ -102,26 +102,25 @@ export function Dashboard({ initialLocation }: { initialLocation: SavedLocation 
 
       {weather && (
         <div className="grid min-w-0 gap-5 lg:grid-cols-[1.3fr_1fr_20rem]">
-          <div className="min-w-0 lg:col-start-1 lg:row-start-1 lg:row-span-2">
+          <div className="min-w-0 lg:col-start-1 lg:row-start-1">
             <CurrentConditionsCard data={weather} />
           </div>
 
-          <div className="min-w-0 lg:col-start-2 lg:row-start-1">
+          <div className="min-w-0 flex flex-col lg:col-start-2 lg:row-start-1">
             <WishGauge wish={weather.wish} />
+            <SunriseSunsetTiles
+              sunrise={weather.sunrise}
+              sunset={weather.sunset}
+              timezone={weather.location.timezone}
+              className="hidden lg:grid"
+            />
           </div>
 
-          <SunriseSunsetTiles
-            sunrise={weather.sunrise}
-            sunset={weather.sunset}
-            timezone={weather.location.timezone}
-            className="hidden lg:grid lg:col-start-2 lg:row-start-2"
-          />
-
-          <div className="min-w-0 lg:col-start-3 lg:row-start-1 lg:row-span-3">
+          <div className="min-w-0 lg:col-start-3 lg:row-start-1 lg:row-span-2">
             <HourlyForecast hourly={weather.hourly} timezone={weather.location.timezone} />
           </div>
 
-          <div className="min-w-0 lg:col-start-1 lg:col-span-2 lg:row-start-3">
+          <div className="min-w-0 lg:col-start-1 lg:col-span-2 lg:row-start-2">
             <SevenDayForecast daily={weather.daily} timezone={weather.location.timezone} />
           </div>
         </div>
