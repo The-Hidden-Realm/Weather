@@ -14,6 +14,7 @@ export type SessionPayload = {
   username: string;
   role: "admin" | "user";
   mustChangePassword: boolean;
+  theme: "dark" | "light";
 };
 
 export async function createSessionToken(payload: SessionPayload): Promise<string> {
@@ -37,6 +38,7 @@ export async function verifySessionToken(token: string): Promise<SessionPayload 
         username: payload.username,
         role: payload.role,
         mustChangePassword: payload.mustChangePassword === true,
+        theme: payload.theme === "light" ? "light" : "dark",
       };
     }
     return null;

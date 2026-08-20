@@ -40,3 +40,11 @@ export function updatePassword(userId: number, newPassword: string) {
     .prepare("UPDATE users SET password_hash = ?, must_change_password = 0 WHERE id = ?")
     .run(hash, userId);
 }
+
+export function updateUsername(userId: number, username: string) {
+  getDb().prepare("UPDATE users SET username = ? WHERE id = ?").run(username, userId);
+}
+
+export function updateTheme(userId: number, theme: "dark" | "light") {
+  getDb().prepare("UPDATE users SET theme = ? WHERE id = ?").run(theme, userId);
+}
