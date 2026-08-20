@@ -11,9 +11,35 @@ if (!fs.existsSync(/* turbopackIgnore: true */ DATA_DIR)) {
 
 const DB_PATH = path.join(DATA_DIR, "weather.db");
 
+// The password the admin account ships with out of the box. Anyone signing
+// in with this exact password is forced to set a new one before continuing.
+export const DEFAULT_ADMIN_PASSWORD = "ChangeMe123!";
+
 declare global {
   // eslint-disable-next-line no-var
   var __weatherDb: Database.Database | undefined;
+}
+
+function ensureMustChangePasswordColumn(db: Database.Database) {
+  const columns = db.prepare("PRAGMA table_info(users)").all() as { name: string }[];
+  if (columns.some((c) => c.name === "must_change_password")) return;
+
+  db.exec(
+    "ALTER TABLE users ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0"
+  );
+
+  // Backfill: anyone whose password still is the shipped default gets
+  // flagged, even if their row predates this column.
+  const users = db.prepare("SELECT id, password_hash FROM users").all() as {
+    id: number;
+    password_hash: string;
+  }[];
+  const flagStmt = db.prepare("UPDATE users SET must_change_password = 1 WHERE id = ?");
+  for (const u of users) {
+    if (bcrypt.compareSync(DEFAULT_ADMIN_PASSWORD, u.password_hash)) {
+      flagStmt.run(u.id);
+    }
+  }
 }
 
 function init(): Database.Database {
@@ -26,6 +52,7 @@ function init(): Database.Database {
       username TEXT UNIQUE NOT NULL,
       password_hash TEXT NOT NULL,
       role TEXT NOT NULL DEFAULT 'user',
+      must_change_password INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
@@ -40,17 +67,20 @@ function init(): Database.Database {
     );
   `);
 
+  ensureMustChangePasswordColumn(db);
+
   const adminUsername = readSecret("ADMIN_USERNAME", "Admin")!;
   const existingAdmin = db
     .prepare("SELECT id FROM users WHERE username = ?")
     .get(adminUsername);
 
   if (!existingAdmin) {
-    const adminPassword = readSecret("ADMIN_PASSWORD", "ChangeMe123!")!;
+    const adminPassword = readSecret("ADMIN_PASSWORD", DEFAULT_ADMIN_PASSWORD)!;
     const hash = bcrypt.hashSync(adminPassword, 10);
+    const mustChange = adminPassword === DEFAULT_ADMIN_PASSWORD ? 1 : 0;
     db.prepare(
-      "INSERT INTO users (username, password_hash, role) VALUES (?, ?, 'admin')"
-    ).run(adminUsername, hash);
+      "INSERT INTO users (username, password_hash, role, must_change_password) VALUES (?, ?, 'admin', ?)"
+    ).run(adminUsername, hash, mustChange);
     console.log(`[db] Seeded admin account "${adminUsername}"`);
   }
 
@@ -69,6 +99,7 @@ export type UserRow = {
   username: string;
   password_hash: string;
   role: "admin" | "user";
+  must_change_password: number;
   created_at: string;
 };
 

@@ -12,8 +12,10 @@ Data comes from [Open-Meteo](https://open-meteo.com/) (current conditions,
 
 ## Features
 
-- Email/password accounts. An `Admin` account is seeded automatically on
-  first boot; anyone else can self-serve sign up.
+- Email/password accounts (case-sensitive usernames). An `Admin` account is
+  seeded automatically on first boot; anyone else can self-serve sign up.
+  Signing in with the default admin password forces a password change
+  before the dashboard is reachable.
 - Each user saves their own location(s) — search by city, or use the
   browser's geolocation. Weather is pulled for whichever location is selected.
 - Homepage: WISH score gauge, current conditions (feels like, wind,
@@ -37,7 +39,9 @@ Data comes from [Open-Meteo](https://open-meteo.com/) (current conditions,
      `openssl rand -base64 32`.
    - `secrets/admin_password.txt` is the initial password for the `Admin`
      account, mounted into the container as a Docker secret (never baked
-     into the image). Change it from the placeholder.
+     into the image). You can leave it as the placeholder (`ChangeMe123!`)
+     — the app will force a password change on first login — or set your
+     own value up front, in which case no forced change happens.
 
 2. Build and start:
 

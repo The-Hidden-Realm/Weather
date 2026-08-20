@@ -13,6 +13,7 @@ export type SessionPayload = {
   userId: number;
   username: string;
   role: "admin" | "user";
+  mustChangePassword: boolean;
 };
 
 export async function createSessionToken(payload: SessionPayload): Promise<string> {
@@ -31,7 +32,12 @@ export async function verifySessionToken(token: string): Promise<SessionPayload 
       typeof payload.username === "string" &&
       (payload.role === "admin" || payload.role === "user")
     ) {
-      return { userId: payload.userId, username: payload.username, role: payload.role };
+      return {
+        userId: payload.userId,
+        username: payload.username,
+        role: payload.role,
+        mustChangePassword: payload.mustChangePassword === true,
+      };
     }
     return null;
   } catch {

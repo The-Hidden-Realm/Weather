@@ -13,8 +13,12 @@ export {
 
 export function findUserByUsername(username: string): UserRow | undefined {
   return getDb()
-    .prepare("SELECT * FROM users WHERE username = ? COLLATE NOCASE")
+    .prepare("SELECT * FROM users WHERE username = ?")
     .get(username) as UserRow | undefined;
+}
+
+export function findUserById(id: number): UserRow | undefined {
+  return getDb().prepare("SELECT * FROM users WHERE id = ?").get(id) as UserRow | undefined;
 }
 
 export function createUser(username: string, password: string, role: "admin" | "user" = "user"): UserRow {
@@ -28,4 +32,11 @@ export function createUser(username: string, password: string, role: "admin" | "
 
 export function verifyPassword(user: UserRow, password: string): boolean {
   return bcrypt.compareSync(password, user.password_hash);
+}
+
+export function updatePassword(userId: number, newPassword: string) {
+  const hash = bcrypt.hashSync(newPassword, 10);
+  getDb()
+    .prepare("UPDATE users SET password_hash = ?, must_change_password = 0 WHERE id = ?")
+    .run(hash, userId);
 }

@@ -24,6 +24,10 @@ export async function proxy(req: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
+  if (session.mustChangePassword && pathname !== "/change-password") {
+    return NextResponse.redirect(new URL("/change-password", req.url));
+  }
+
   if (pathname.startsWith("/admin") && session.role !== "admin") {
     return NextResponse.redirect(new URL("/", req.url));
   }

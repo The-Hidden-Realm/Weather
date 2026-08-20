@@ -30,7 +30,12 @@ export async function POST(req: NextRequest) {
   }
 
   const user = createUser(cleanUsername, password, "user");
-  await setSessionCookie({ userId: user.id, username: user.username, role: user.role });
+  await setSessionCookie({
+    userId: user.id,
+    username: user.username,
+    role: user.role,
+    mustChangePassword: false,
+  });
 
   return NextResponse.json({ ok: true, role: user.role });
 }

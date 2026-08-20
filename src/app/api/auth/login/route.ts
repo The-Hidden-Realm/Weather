@@ -13,7 +13,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid username or password." }, { status: 401 });
   }
 
-  await setSessionCookie({ userId: user.id, username: user.username, role: user.role });
+  await setSessionCookie({
+    userId: user.id,
+    username: user.username,
+    role: user.role,
+    mustChangePassword: user.must_change_password === 1,
+  });
 
-  return NextResponse.json({ ok: true, role: user.role });
+  return NextResponse.json({ ok: true, role: user.role, mustChangePassword: user.must_change_password === 1 });
 }
