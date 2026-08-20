@@ -79,6 +79,68 @@ function ensureAdminControlColumns(db: Database.Database) {
   }
 }
 
+// Some feeds serve video and audio from separate sources (e.g. a silent
+// video stream plus an independent audio-only stream). audio_url holds that
+// second link; has_audio is kept in sync with whether it's set.
+function ensureCameraAudioUrlColumn(db: Database.Database) {
+  const columns = db.prepare("PRAGMA table_info(cameras)").all() as { name: string }[];
+  if (columns.some((c) => c.name === "audio_url")) return;
+  db.exec("ALTER TABLE cameras ADD COLUMN audio_url TEXT");
+}
+
+// Seeded once, only if no cameras exist yet — so an admin deleting them
+// (once real cameras are added) doesn't cause them to reappear on restart.
+const TEST_CAMERAS: { name: string; category: string; sourceUrl: string; hasAudio: number }[] = [
+  {
+    name: "Test Camera 1",
+    category: "Test",
+    sourceUrl: "https://archive.org/download/big-bunny-sample-video/SampleVideo.mp4",
+    hasAudio: 1,
+  },
+  {
+    name: "Test Camera 2",
+    category: "Test",
+    sourceUrl: "https://archive.org/download/SampleVideo1280x7205mb/SampleVideo_1280x720_5mb.mp4",
+    hasAudio: 0,
+  },
+  {
+    name: "Test Camera 3",
+    category: "Test",
+    sourceUrl: "https://archive.org/download/sample-mp4-file/sample-mp4-file.mp4",
+    hasAudio: 0,
+  },
+  {
+    name: "Test Camera 4",
+    category: "Test",
+    sourceUrl: "https://archive.org/download/Sample-Video-Mp4/IMG_6303.mp4",
+    hasAudio: 1,
+  },
+  {
+    name: "Lightning Storm Feed",
+    category: "Storm",
+    sourceUrl: "https://archive.org/download/LightningPhotoJPEG/Lightning%20PhotoJPEG.mp4",
+    hasAudio: 0,
+  },
+  {
+    name: "Cumulus Clouds Timelapse",
+    category: "Sky",
+    sourceUrl: "https://archive.org/download/CumulusClouds/CumulusCloudsDnxhd.mp4",
+    hasAudio: 0,
+  },
+];
+
+function ensureTestCameras(db: Database.Database) {
+  const { count } = db.prepare("SELECT COUNT(*) as count FROM cameras").get() as { count: number };
+  if (count > 0) return;
+  const insert = db.prepare(
+    "INSERT INTO cameras (name, category, source_url, has_audio) VALUES (?, ?, ?, ?)"
+  );
+  for (const cam of TEST_CAMERAS) {
+    insert.run(cam.name, cam.category, cam.sourceUrl, cam.hasAudio);
+  }
+  console.log(`[db] Seeded ${TEST_CAMERAS.length} test cameras`);
+}
+
 function init(): Database.Database {
   const db = new Database(DB_PATH);
   db.pragma("journal_mode = WAL");
@@ -106,6 +168,22 @@ function init(): Database.Database {
       is_default INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
+
+    CREATE TABLE IF NOT EXISTS cameras (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      category TEXT NOT NULL,
+      source_url TEXT NOT NULL,
+      has_audio INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS camera_layout (
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      slot INTEGER NOT NULL,
+      camera_id INTEGER REFERENCES cameras(id) ON DELETE SET NULL,
+      PRIMARY KEY (user_id, slot)
+    );
   `);
 
   ensureMustChangePasswordColumn(db);
@@ -113,6 +191,8 @@ function init(): Database.Database {
   ensureLocationDetailColumns(db);
   ensureUserPreferenceColumns(db);
   ensureAdminControlColumns(db);
+  ensureCameraAudioUrlColumn(db);
+  ensureTestCameras(db);
 
   const adminUsername = readSecret("ADMIN_USERNAME", "Admin")!;
   const existingAdmin = db
@@ -163,4 +243,20 @@ export type LocationRow = {
   lon: number;
   is_default: number;
   created_at: string;
+};
+
+export type CameraRow = {
+  id: number;
+  name: string;
+  category: string;
+  source_url: string;
+  has_audio: number;
+  audio_url: string | null;
+  created_at: string;
+};
+
+export type CameraLayoutRow = {
+  user_id: number;
+  slot: number;
+  camera_id: number | null;
 };

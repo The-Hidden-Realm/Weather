@@ -2,12 +2,31 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import type { SessionPayload } from "@/lib/session";
 import { AlertsBell } from "@/components/AlertsBell";
 
+const NAV_LINKS = [
+  { href: "/", label: "Home" },
+  { href: "/cameras", label: "Cameras" },
+];
+
+function NavLink({ href, label, active }: { href: string; label: string; active: boolean }) {
+  return (
+    <Link
+      href={href}
+      className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${
+        active ? "bg-accent/15 text-accent-2" : "text-muted hover:bg-surface-2 hover:text-foreground"
+      }`}
+    >
+      {label}
+    </Link>
+  );
+}
+
 export function TopNav({ session }: { session: SessionPayload }) {
   const router = useRouter();
+  const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -29,8 +48,8 @@ export function TopNav({ session }: { session: SessionPayload }) {
 
   return (
     <header className="border-b border-border">
-      <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6">
-        <Link href="/" className="flex items-center gap-2">
+      <div className="mx-auto flex max-w-7xl items-center gap-6 px-4 py-4 sm:px-6">
+        <Link href="/" className="flex shrink-0 items-center gap-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent/15 text-accent">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
               <path d="M17.5 19a4.5 4.5 0 0 0 0-9 6 6 0 0 0-11.6-1.7A4 4 0 0 0 6 16h11.5Z" />
@@ -39,7 +58,13 @@ export function TopNav({ session }: { session: SessionPayload }) {
           <span className="font-semibold text-foreground">The Hidden Realm Weather</span>
         </Link>
 
-        <div className="flex items-center gap-3">
+        <nav className="flex items-center gap-1">
+          {NAV_LINKS.map((link) => (
+            <NavLink key={link.href} href={link.href} label={link.label} active={pathname === link.href} />
+          ))}
+        </nav>
+
+        <div className="ml-auto flex items-center gap-3">
           <AlertsBell />
 
           <div ref={menuRef} className="relative">
