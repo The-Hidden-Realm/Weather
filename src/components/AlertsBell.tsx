@@ -3,13 +3,14 @@
 import { useEffect, useRef, useState } from "react";
 import type { NwsAlert } from "@/lib/weather/types";
 import { playAlertChime } from "@/lib/alertSound";
+import { AlertDetailModal } from "@/components/AlertDetailModal";
 
 const POLL_MS = 5 * 60 * 1000;
 
 export function AlertsBell() {
   const [alerts, setAlerts] = useState<NwsAlert[]>([]);
   const [open, setOpen] = useState(false);
-  const [unread, setUnread] = useState(false);
+  const [selected, setSelected] = useState<NwsAlert | null>(null);
   const seenIds = useRef<Set<string> | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -29,10 +30,7 @@ export function AlertsBell() {
           seenIds.current = new Set(fetched.map((a) => a.id));
         } else {
           const isNew = fetched.some((a) => !seenIds.current!.has(a.id));
-          if (isNew) {
-            setUnread(true);
-            playAlertChime();
-          }
+          if (isNew) playAlertChime();
           seenIds.current = new Set(fetched.map((a) => a.id));
         }
         setAlerts(fetched);
@@ -59,15 +57,10 @@ export function AlertsBell() {
     return () => document.removeEventListener("mousedown", onClickOutside);
   }, []);
 
-  function toggleOpen() {
-    setOpen((o) => !o);
-    setUnread(false);
-  }
-
   return (
     <div ref={menuRef} className="relative">
       <button
-        onClick={toggleOpen}
+        onClick={() => setOpen((o) => !o)}
         aria-label="Weather alerts"
         className="relative flex h-9 w-9 items-center justify-center rounded-lg border border-border text-muted transition hover:border-accent hover:text-foreground"
       >
@@ -75,8 +68,10 @@ export function AlertsBell() {
           <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
           <path d="M13.73 21a2 2 0 0 1-3.46 0" />
         </svg>
-        {unread && (
-          <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-danger" />
+        {alerts.length > 0 && (
+          <span className="absolute -right-1 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-danger px-1 text-[10px] font-semibold leading-none text-white">
+            {alerts.length}
+          </span>
         )}
       </button>
 
@@ -90,16 +85,25 @@ export function AlertsBell() {
           ) : (
             <div className="max-h-80 divide-y divide-border overflow-y-auto">
               {alerts.map((a) => (
-                <div key={a.id} className="px-3 py-3">
+                <button
+                  key={a.id}
+                  onClick={() => {
+                    setSelected(a);
+                    setOpen(false);
+                  }}
+                  className="block w-full px-3 py-3 text-left hover:bg-accent/10"
+                >
                   <p className="text-sm font-semibold text-danger">{a.event}</p>
                   <p className="mt-0.5 text-xs text-foreground/80">{a.headline}</p>
                   <p className="mt-1 text-[11px] text-muted">{a.areaDesc}</p>
-                </div>
+                </button>
               ))}
             </div>
           )}
         </div>
       )}
+
+      {selected && <AlertDetailModal alert={selected} onClose={() => setSelected(null)} />}
     </div>
   );
 }

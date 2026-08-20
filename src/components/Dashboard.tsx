@@ -7,6 +7,7 @@ import { WishGauge } from "@/components/WishGauge";
 import { CurrentConditionsCard } from "@/components/CurrentConditionsCard";
 import { HourlyForecast } from "@/components/HourlyForecast";
 import { SevenDayForecast } from "@/components/SevenDayForecast";
+import { SunriseSunsetTiles } from "@/components/SunriseSunsetTile";
 
 export type SavedLocation = {
   id: number;
@@ -100,20 +101,27 @@ export function Dashboard({ initialLocation }: { initialLocation: SavedLocation 
       )}
 
       {weather && (
-        <div className="grid gap-5 lg:grid-cols-[1.3fr_1fr_20rem]">
-          <div className="lg:col-start-1 lg:row-start-1">
+        <div className="grid min-w-0 gap-5 lg:grid-cols-[1.3fr_1fr_20rem]">
+          <div className="min-w-0 lg:col-start-1 lg:row-start-1 lg:row-span-2">
             <CurrentConditionsCard data={weather} />
           </div>
 
-          <div className="lg:col-start-2 lg:row-start-1">
+          <div className="min-w-0 lg:col-start-2 lg:row-start-1">
             <WishGauge wish={weather.wish} />
           </div>
 
-          <div className="lg:col-start-3 lg:row-start-1 lg:row-span-2">
+          <SunriseSunsetTiles
+            sunrise={weather.sunrise}
+            sunset={weather.sunset}
+            timezone={weather.location.timezone}
+            className="hidden lg:grid lg:col-start-2 lg:row-start-2"
+          />
+
+          <div className="min-w-0 lg:col-start-3 lg:row-start-1 lg:row-span-3">
             <HourlyForecast hourly={weather.hourly} timezone={weather.location.timezone} />
           </div>
 
-          <div className="lg:col-start-1 lg:col-span-2 lg:row-start-2">
+          <div className="min-w-0 lg:col-start-1 lg:col-span-2 lg:row-start-3">
             <SevenDayForecast daily={weather.daily} timezone={weather.location.timezone} />
           </div>
         </div>

@@ -4,7 +4,7 @@ function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
 }
 
-// WISH = Weather Intensity Score for Here.
+// WIS = Weather Intensity Score.
 // A 0-100 composite of how "in your face" the current weather is, blending
 // wind, precipitation, temperature extremity, visibility, storm activity,
 // and any active NWS alerts for the location.

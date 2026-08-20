@@ -19,15 +19,15 @@ export function HourlyForecast({ hourly, timezone }: { hourly: HourlyPoint[]; ti
               <span className="w-10 flex-1 text-sm font-semibold text-foreground">
                 {formatTemp(h.temperature)}
               </span>
-              <span className="flex w-10 items-center justify-end gap-0.5 text-[11px] text-accent-2">
-                {h.precipitationProbability > 0 && (
-                  <>
-                    <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M12 2c4 5.5 7 9 7 12.5A7 7 0 0 1 5 14.5C5 11 8 7.5 12 2Z" />
-                    </svg>
-                    {h.precipitationProbability}%
-                  </>
-                )}
+              <span
+                className={`flex w-10 items-center justify-end gap-0.5 text-[11px] ${
+                  h.precipitationProbability > 0 ? "text-accent-2" : "text-muted/60"
+                }`}
+              >
+                <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 2c4 5.5 7 9 7 12.5A7 7 0 0 1 5 14.5C5 11 8 7.5 12 2Z" />
+                </svg>
+                {h.precipitationProbability}%
               </span>
             </div>
           );
