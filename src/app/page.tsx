@@ -15,7 +15,7 @@ export default async function Home() {
     <div className="min-h-dvh">
       <TopNav session={session} />
       <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
-        <Dashboard initialLocation={location ?? null} />
+        <Dashboard initialLocation={location ?? null} isAdmin={session.role === "admin"} />
       </main>
     </div>
   );

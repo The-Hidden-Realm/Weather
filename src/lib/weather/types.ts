@@ -73,6 +73,7 @@ export type WeatherPayload = {
   sunrise: string;
   sunset: string;
   source: { openMeteo: boolean; nws: boolean };
+  fetchedAt: string;
 };
 
 export type GeocodeResult = {

@@ -19,7 +19,13 @@ export type SavedLocation = {
   is_default: number;
 };
 
-export function Dashboard({ initialLocation }: { initialLocation: SavedLocation | null }) {
+export function Dashboard({
+  initialLocation,
+  isAdmin = false,
+}: {
+  initialLocation: SavedLocation | null;
+  isAdmin?: boolean;
+}) {
   const [location, setLocation] = useState<SavedLocation | null>(initialLocation);
   const [weather, setWeather] = useState<WeatherPayload | null>(null);
   const [loading, setLoading] = useState(false);
@@ -50,6 +56,53 @@ export function Dashboard({ initialLocation }: { initialLocation: SavedLocation 
     // eslint-disable-next-line react-hooks/set-state-in-effect
     if (location) loadWeather(location);
   }, [location, loadWeather]);
+
+  const timezone = weather?.location.timezone;
+
+  useEffect(() => {
+    // Auto-refresh aligned to :00/:15/:30/:45 on the clock in the location's
+    // own timezone, not "15 minutes after the last fetch" — so a manual
+    // refresh in between never pushes this schedule back.
+    if (!location || !timezone) return;
+    const loc = location;
+
+    function msUntilNextQuarterHour() {
+      const now = new Date();
+      const parts = new Intl.DateTimeFormat("en-US", {
+        timeZone: timezone,
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: false,
+      }).formatToParts(now);
+      const minute = Number(parts.find((p) => p.type === "minute")?.value ?? 0);
+      const second = Number(parts.find((p) => p.type === "second")?.value ?? 0);
+      const minutesUntilNext = 15 - (minute % 15);
+      const msUntil = minutesUntilNext * 60_000 - second * 1000 - now.getMilliseconds();
+      return msUntil <= 0 ? msUntil + 15 * 60_000 : msUntil;
+    }
+
+    let timer: ReturnType<typeof setTimeout>;
+    function scheduleNext() {
+      timer = setTimeout(() => {
+        loadWeather(loc);
+        scheduleNext();
+      }, msUntilNextQuarterHour());
+    }
+    scheduleNext();
+
+    return () => clearTimeout(timer);
+    // loadWeather is a stable useCallback ([] deps) — omitted to avoid
+    // re-arming the timer on every fetch, which would defeat the alignment.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location, timezone]);
+
+  function handleManualRefresh() {
+    // Admin-only, and scoped to this browser session: every fetch already
+    // hits the API fresh with no shared cache, so this never touches what
+    // other users see, and the quarter-hour timer above keeps ticking
+    // independently of this call.
+    if (location) loadWeather(location);
+  }
 
   async function handleSet(result: GeocodeResult) {
     setError(null);
@@ -85,7 +138,22 @@ export function Dashboard({ initialLocation }: { initialLocation: SavedLocation 
 
   return (
     <div className="space-y-5">
-      <LocationHeader location={location} onSet={handleSet} error={error} />
+      <LocationHeader
+        location={location}
+        onSet={handleSet}
+        error={error}
+        lastUpdated={
+          weather
+            ? {
+                fetchedAt: weather.fetchedAt,
+                timezone: weather.location.timezone,
+                isAdmin,
+                onRefresh: handleManualRefresh,
+                refreshing: loading,
+              }
+            : null
+        }
+      />
 
       {!location && (
         <div className="rounded-2xl border border-dashed border-border bg-surface/50 p-10 text-center">
@@ -101,29 +169,35 @@ export function Dashboard({ initialLocation }: { initialLocation: SavedLocation 
       )}
 
       {weather && (
-        <div className="grid min-w-0 gap-5 lg:grid-cols-[1.3fr_1fr_20rem]">
-          <div className="min-w-0 lg:col-start-1 lg:row-start-1">
-            <CurrentConditionsCard data={weather} />
-          </div>
+        <div className="grid min-w-0 gap-5 lg:grid-cols-[1fr_20rem] lg:items-start">
+          <div className="min-w-0 grid gap-5 lg:grid-cols-[1.3fr_1fr]">
+            <div className="min-w-0">
+              <CurrentConditionsCard data={weather} />
+            </div>
 
-          <div className="min-w-0 flex h-full flex-col lg:col-start-2 lg:row-start-1">
-            <WishGauge wish={weather.wish} />
-            <div className="hidden flex-1 lg:flex lg:items-center">
-              <SunriseSunsetTiles
-                sunrise={weather.sunrise}
-                sunset={weather.sunset}
+            <div className="min-w-0 flex flex-col gap-5 self-start">
+              <WishGauge wish={weather.wish} />
+              <div className="hidden lg:block">
+                <SunriseSunsetTiles
+                  sunrise={weather.sunrise}
+                  sunset={weather.sunset}
+                  timezone={weather.location.timezone}
+                  className="w-full"
+                />
+              </div>
+            </div>
+
+            <div className="min-w-0 lg:col-span-2">
+              <SevenDayForecast
+                daily={weather.daily}
+                hourly={weather.hourly}
                 timezone={weather.location.timezone}
-                className="w-full"
               />
             </div>
           </div>
 
-          <div className="min-w-0 lg:col-start-3 lg:row-start-1 lg:row-span-2">
-            <HourlyForecast hourly={weather.hourly} timezone={weather.location.timezone} />
-          </div>
-
-          <div className="min-w-0 lg:col-start-1 lg:col-span-2 lg:row-start-2">
-            <SevenDayForecast daily={weather.daily} timezone={weather.location.timezone} />
+          <div className="min-w-0">
+            <HourlyForecast hourly={weather.hourly.slice(0, 12)} timezone={weather.location.timezone} />
           </div>
         </div>
       )}

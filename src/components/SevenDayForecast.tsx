@@ -1,24 +1,39 @@
-import type { DailyPoint } from "@/lib/weather/types";
+"use client";
+
+import { useState } from "react";
+import type { DailyPoint, HourlyPoint } from "@/lib/weather/types";
 import { describeWeatherCode } from "@/lib/weather/wmo";
 import { WeatherIcon } from "@/components/WeatherIcon";
+import { DayDetailModal } from "@/components/DayDetailModal";
 import { formatDay, formatTemp } from "@/lib/weather/format";
 
-export function SevenDayForecast({ daily, timezone }: { daily: DailyPoint[]; timezone: string }) {
+export function SevenDayForecast({
+  daily,
+  hourly,
+  timezone,
+}: {
+  daily: DailyPoint[];
+  hourly: HourlyPoint[];
+  timezone: string;
+}) {
+  const [selected, setSelected] = useState<{ day: DailyPoint; label: string } | null>(null);
+
   return (
     <div className="rounded-2xl border border-border bg-surface/70 p-5">
       <h2 className="mb-4 text-sm font-medium text-muted">7-day forecast</h2>
       <div className="flex gap-3 overflow-x-auto pb-1">
         {daily.map((d, i) => {
           const { description, icon } = describeWeatherCode(d.weatherCode, true);
+          const label = i === 0 ? "Today" : formatDay(d.date, timezone);
           return (
-            <div
+            <button
               key={d.date}
+              type="button"
               title={description}
-              className="flex min-w-[92px] flex-1 flex-col items-center gap-2 rounded-xl border border-border/60 bg-surface-2/60 px-2 py-4 text-center"
+              onClick={() => setSelected({ day: d, label })}
+              className="flex min-w-[92px] flex-1 flex-col items-center gap-2 rounded-xl border border-border/60 bg-surface-2/60 px-2 py-4 text-center transition hover:border-accent hover:bg-surface-2"
             >
-              <span className="text-sm font-medium text-foreground">
-                {i === 0 ? "Today" : formatDay(d.date, timezone)}
-              </span>
+              <span className="text-sm font-medium text-foreground">{label}</span>
               <WeatherIcon icon={icon} className="h-9 w-9" />
               <div className="flex items-baseline gap-1.5">
                 <span className="text-sm font-semibold text-foreground">{formatTemp(d.tempMax)}</span>
@@ -34,10 +49,20 @@ export function SevenDayForecast({ daily, timezone }: { daily: DailyPoint[]; tim
                 </svg>
                 {d.precipitationProbability}%
               </span>
-            </div>
+            </button>
           );
         })}
       </div>
+
+      {selected && (
+        <DayDetailModal
+          day={selected.day}
+          dayLabel={selected.label}
+          hourly={hourly.filter((h) => h.time.startsWith(selected.day.date))}
+          timezone={timezone}
+          onClose={() => setSelected(null)}
+        />
+      )}
     </div>
   );
 }
