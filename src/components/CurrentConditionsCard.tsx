@@ -41,7 +41,7 @@ export function CurrentConditionsCard({ data }: { data: WeatherPayload }) {
         <span className="text-sm text-muted">{description}</span>
       </div>
 
-      <div className="mt-5 grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-5">
+      <div className="mt-5 grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
         {stats.map((s) => (
           <div key={s.label}>
             <p className="text-[11px] uppercase tracking-wide text-muted/80">{s.label}</p>

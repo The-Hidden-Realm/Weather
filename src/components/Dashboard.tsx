@@ -100,17 +100,23 @@ export function Dashboard({ initialLocation }: { initialLocation: SavedLocation 
       )}
 
       {weather && (
-        <>
-          <div className="grid gap-5 lg:grid-cols-[1fr_20rem]">
-            <div className="space-y-5">
-              <CurrentConditionsCard data={weather} />
-              <WishGauge wish={weather.wish} />
-            </div>
+        <div className="grid gap-5 lg:grid-cols-[1.3fr_1fr_20rem]">
+          <div className="lg:col-start-1 lg:row-start-1">
+            <CurrentConditionsCard data={weather} />
+          </div>
+
+          <div className="lg:col-start-2 lg:row-start-1">
+            <WishGauge wish={weather.wish} />
+          </div>
+
+          <div className="lg:col-start-3 lg:row-start-1 lg:row-span-2">
             <HourlyForecast hourly={weather.hourly} timezone={weather.location.timezone} />
           </div>
 
-          <SevenDayForecast daily={weather.daily} timezone={weather.location.timezone} />
-        </>
+          <div className="lg:col-start-1 lg:col-span-2 lg:row-start-2">
+            <SevenDayForecast daily={weather.daily} timezone={weather.location.timezone} />
+          </div>
+        </div>
       )}
     </div>
   );
