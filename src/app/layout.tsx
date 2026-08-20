@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Wisp Weather",
+  title: "The Hidden Realm Weather",
   description: "A dark-themed weather dashboard with a WISH intensity score, powered by Open-Meteo and the National Weather Service.",
 };
 

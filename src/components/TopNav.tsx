@@ -35,7 +35,7 @@ export function TopNav({ session }: { session: SessionPayload }) {
               <path d="M17.5 19a4.5 4.5 0 0 0 0-9 6 6 0 0 0-11.6-1.7A4 4 0 0 0 6 16h11.5Z" />
             </svg>
           </div>
-          <span className="font-semibold text-foreground">Wisp Weather</span>
+          <span className="font-semibold text-foreground">The Hidden Realm Weather</span>
         </Link>
 
         <div ref={menuRef} className="relative">

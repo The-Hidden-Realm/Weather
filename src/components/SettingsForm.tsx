@@ -157,13 +157,15 @@ function PasswordCard() {
             autoComplete="new-password"
           />
         </div>
-        <button
-          type="submit"
-          disabled={loading || !currentPassword || !newPassword}
-          className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition hover:bg-accent-2 disabled:opacity-50"
-        >
-          {loading ? "Saving…" : "Update password"}
-        </button>
+        <div className="flex justify-end">
+          <button
+            type="submit"
+            disabled={loading || !currentPassword || !newPassword}
+            className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition hover:bg-accent-2 disabled:opacity-50"
+          >
+            {loading ? "Saving…" : "Update password"}
+          </button>
+        </div>
       </form>
       {message && <Message {...message} />}
     </Card>
@@ -193,7 +195,7 @@ function ThemeCard({ initialTheme, onChanged }: { initialTheme: "dark" | "light"
   }
 
   return (
-    <Card title="Appearance" description="Pick how Wisp Weather looks for your account.">
+    <Card title="Appearance" description="Pick how The Hidden Realm Weather looks for your account.">
       <div className="flex gap-3">
         <ThemeOption label="Dark" active={theme === "dark"} onClick={() => selectTheme("dark")}>
           <div className="h-14 w-full rounded-lg border border-border/60 bg-[#0a0e17] p-2">

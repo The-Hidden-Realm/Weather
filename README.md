@@ -1,4 +1,4 @@
-# Wisp Weather
+# The Hidden Realm Weather
 
 A dark-themed weather dashboard with a custom **WISH score** (Weather Intensity
 Score for Here) — a 0-100 read on how "in your face" the weather is right now,
