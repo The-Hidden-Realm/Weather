@@ -52,6 +52,7 @@
 
 html {
   color-scheme: dark;
+  background: var(--background);
 }
 
 html[data-theme="light"] {
@@ -63,6 +64,7 @@ body {
     radial-gradient(1200px 600px at 15% -10%, rgba(59, 130, 246, 0.16), transparent 60%),
     radial-gradient(900px 500px at 100% 0%, rgba(96, 165, 250, 0.1), transparent 55%),
     var(--background);
+  background-attachment: fixed;
   color: var(--foreground);
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
   min-height: 100dvh;
