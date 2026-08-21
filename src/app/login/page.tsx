@@ -28,7 +28,6 @@ function LoginForm() {
         return;
       }
       router.push(params.get("next") || "/");
-      router.refresh();
     } catch {
       setError("Something went wrong. Try again.");
     } finally {

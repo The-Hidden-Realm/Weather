@@ -86,7 +86,6 @@ export function TopNav({ session }: { session: SessionPayload & { enabledFeature
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" });
     router.push("/login");
-    router.refresh();
   }
 
   const visibleToolsLinks = TOOLS_LINKS.filter((link) => enabledFeatures.includes(link.feature));

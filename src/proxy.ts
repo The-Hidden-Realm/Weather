@@ -18,7 +18,6 @@ export async function proxy(req: NextRequest) {
 
   const token = req.cookies.get(SESSION_COOKIE_NAME)?.value;
   const session = token ? await verifySessionToken(token) : null;
-  console.log("[proxy]", pathname, "token present:", !!token, "session:", session);
 
   if (!session) {
     const loginUrl = new URL("/login", req.url);
@@ -31,7 +30,6 @@ export async function proxy(req: NextRequest) {
     // by signing in with the password being replaced, so there's no need
     // to ask for it again.
     if (pathname !== "/reset-password") {
-      console.log("[proxy] redirecting to /reset-password from", pathname);
       return NextResponse.redirect(new URL("/reset-password", req.url));
     }
   }
