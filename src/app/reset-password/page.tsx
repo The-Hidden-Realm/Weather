@@ -35,6 +35,7 @@ export default function ResetPasswordPage() {
       window.location.href = "/";
     } catch {
       setError("Something went wrong. Try again.");
+    } finally {
       setLoading(false);
     }
   }

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { GeocodeResult, WeatherPayload } from "@/lib/weather/types";
+import { resolveLocation } from "@/lib/resolveLocation";
 import { LocationHeader } from "@/components/LocationHeader";
 import { WishGauge } from "@/components/WishGauge";
 import { CurrentConditionsCard } from "@/components/CurrentConditionsCard";
@@ -204,27 +205,12 @@ export function Dashboard({
 
   async function handleSet(result: GeocodeResult) {
     setError(null);
-    let label = result.name;
-    let state = result.admin1 || "";
-    let zip = "";
-
-    try {
-      const geoRes = await fetch(`/api/reverse-geocode?lat=${result.lat}&lon=${result.lon}`);
-      if (geoRes.ok) {
-        const geo = await geoRes.json();
-        zip = geo.zip || "";
-        if (!label) label = geo.name;
-        if (!state) state = geo.state;
-      }
-    } catch {
-      // Reverse geocoding is a nice-to-have for state/zip — press on without it.
-    }
-    if (!label) label = "Unknown location";
+    const resolved = await resolveLocation(result);
 
     const res = await fetch("/api/locations", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ label, state, zip, lat: result.lat, lon: result.lon }),
+      body: JSON.stringify(resolved),
     });
     if (!res.ok) {
       setError("Couldn't save that location. Try again.");

@@ -104,6 +104,25 @@ function ensureAdminControlColumns(db: Database.Database) {
   }
 }
 
+// first_name/email are visible only to the account owner (Settings) and
+// admins (Admin panel) — never exposed anywhere else. onboarding_completed
+// gates the post-signup welcome flow that collects them, so it defaults to
+// 0 for brand-new rows; existing accounts are backfilled to 1 below so they
+// aren't retroactively forced through a flow that didn't exist yet.
+function ensureOnboardingColumns(db: Database.Database) {
+  const columns = db.prepare("PRAGMA table_info(users)").all() as { name: string }[];
+  if (!columns.some((c) => c.name === "first_name")) {
+    db.exec("ALTER TABLE users ADD COLUMN first_name TEXT NOT NULL DEFAULT ''");
+  }
+  if (!columns.some((c) => c.name === "email")) {
+    db.exec("ALTER TABLE users ADD COLUMN email TEXT NOT NULL DEFAULT ''");
+  }
+  if (!columns.some((c) => c.name === "onboarding_completed")) {
+    db.exec("ALTER TABLE users ADD COLUMN onboarding_completed INTEGER NOT NULL DEFAULT 0");
+    db.exec("UPDATE users SET onboarding_completed = 1");
+  }
+}
+
 // Some feeds serve video and audio from separate sources (e.g. a silent
 // video stream plus an independent audio-only stream). audio_url holds that
 // second link; has_audio is kept in sync with whether it's set.
@@ -230,6 +249,7 @@ function init(): Database.Database {
   ensureLocationDetailColumns(db);
   ensureUserPreferenceColumns(db);
   ensureAdminControlColumns(db);
+  ensureOnboardingColumns(db);
   ensureCameraAudioUrlColumn(db);
   ensureTestCameras(db);
 
@@ -244,7 +264,9 @@ function init(): Database.Database {
     const mustChange = adminPassword === DEFAULT_ADMIN_PASSWORD ? 1 : 0;
     const mustChangeReason = mustChange ? "default" : null;
     db.prepare(
-      "INSERT INTO users (username, password_hash, role, must_change_password, must_change_password_reason) VALUES (?, ?, 'admin', ?, ?)"
+      // The shipped admin account is infrastructure, not a new signup — it
+      // skips the onboarding welcome flow entirely.
+      "INSERT INTO users (username, password_hash, role, must_change_password, must_change_password_reason, onboarding_completed) VALUES (?, ?, 'admin', ?, ?, 1)"
     ).run(adminUsername, hash, mustChange, mustChangeReason);
     console.log(`[db] Seeded admin account "${adminUsername}"`);
   }
@@ -272,6 +294,9 @@ export type UserRow = {
   time_format: "12h" | "24h";
   is_active: number;
   last_login: string | null;
+  first_name: string;
+  email: string;
+  onboarding_completed: number;
   created_at: string;
 };
 

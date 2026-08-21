@@ -17,9 +17,13 @@ function formatDate(iso: string): string {
 }
 
 type ModalState =
-  | { type: "delete"; user: AdminUser }
-  | { type: "role"; user: AdminUser; nextRole: "admin" | "user" }
-  | { type: "reset"; user: AdminUser };
+  // returnToInfo: opened from inside the "more info" command center, so
+  // backing out without completing the action should reopen it instead of
+  // just closing everything — easy to recover from an accidental click.
+  | { type: "delete"; user: AdminUser; returnToInfo?: boolean }
+  | { type: "role"; user: AdminUser; nextRole: "admin" | "user"; returnToInfo?: boolean }
+  | { type: "reset"; user: AdminUser; returnToInfo?: boolean }
+  | { type: "info"; user: AdminUser };
 
 export function AdminUserTable({
   initialUsers,
@@ -73,7 +77,7 @@ export function AdminUserTable({
   }
 
   async function handleModalConfirm(adminPassword: string): Promise<ConfirmResult> {
-    if (!modal) return { ok: false, error: "Nothing to confirm." };
+    if (!modal || modal.type === "info") return { ok: false, error: "Nothing to confirm." };
 
     if (modal.type === "delete") {
       const res = await fetch(`/api/admin/users/${modal.user.id}`, {
@@ -110,7 +114,7 @@ export function AdminUserTable({
     return { ok: true, revealValue: data.tempPassword };
   }
 
-  function modalProps(m: ModalState) {
+  function modalProps(m: Exclude<ModalState, { type: "info" }>) {
     if (m.type === "delete") {
       return {
         title: `Delete ${m.user.username}?`,
@@ -180,6 +184,7 @@ export function AdminUserTable({
                   onToggleFeature={(feature) => handleToggleFeature(u, feature)}
                   onDeleteRequest={() => setModal({ type: "delete", user: u })}
                   onResetPasswordRequest={() => setModal({ type: "reset", user: u })}
+                  onInfoRequest={() => setModal({ type: "info", user: u })}
                 />
               ))
             )}
@@ -187,13 +192,169 @@ export function AdminUserTable({
         </table>
       </div>
 
-      {modal && (
-        <AdminPasswordConfirmModal
-          {...modalProps(modal)}
-          onConfirm={handleModalConfirm}
-          onClose={() => setModal(null)}
-        />
-      )}
+      {modal && modal.type === "info" && (() => {
+        // Re-derived from the live list (not the snapshot captured when the
+        // modal opened) so toggling status/features updates what's shown
+        // immediately instead of freezing at open-time values.
+        const liveUser = users.find((u) => u.id === modal.user.id) ?? modal.user;
+        return (
+          <UserManagementModal
+            user={liveUser}
+            onClose={() => setModal(null)}
+            onRoleChangeRequest={(nextRole) => setModal({ type: "role", user: liveUser, nextRole, returnToInfo: true })}
+            onToggleActive={() => handleToggleActive(liveUser)}
+            onToggleFeature={(feature) => handleToggleFeature(liveUser, feature)}
+            onResetPasswordRequest={() => setModal({ type: "reset", user: liveUser, returnToInfo: true })}
+            onDeleteRequest={() => setModal({ type: "delete", user: liveUser, returnToInfo: true })}
+          />
+        );
+      })()}
+
+      {modal && modal.type !== "info" && (() => {
+        const m = modal;
+        return (
+          <AdminPasswordConfirmModal
+            {...modalProps(m)}
+            onConfirm={handleModalConfirm}
+            onClose={() => setModal(null)}
+            onCancel={() => setModal(m.returnToInfo ? { type: "info", user: m.user } : null)}
+          />
+        );
+      })()}
+    </div>
+  );
+}
+
+function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="flex items-center justify-between gap-4 py-2">
+      <span className="text-xs text-muted">{label}</span>
+      <span className="text-sm text-foreground">{value}</span>
+    </div>
+  );
+}
+
+function RoleSelect({
+  user,
+  disabled,
+  disabledTitle,
+  onRoleChangeRequest,
+}: {
+  user: AdminUser;
+  disabled: boolean;
+  disabledTitle?: string;
+  onRoleChangeRequest: (role: "admin" | "user") => void;
+}) {
+  return (
+    <select
+      value={user.role}
+      disabled={disabled}
+      title={disabledTitle}
+      onChange={(e) => onRoleChangeRequest(e.target.value as "admin" | "user")}
+      className={`rounded-full border-0 px-2 py-0.5 text-xs outline-none disabled:opacity-60 ${
+        user.role === "admin" ? "bg-accent/15 text-accent-2" : "bg-surface-2 text-muted"
+      }`}
+    >
+      <option value="user">User</option>
+      <option value="admin">Admin</option>
+    </select>
+  );
+}
+
+function StatusToggle({
+  user,
+  disabled,
+  disabledTitle,
+  onToggleActive,
+}: {
+  user: AdminUser;
+  disabled: boolean;
+  disabledTitle?: string;
+  onToggleActive: () => void;
+}) {
+  const active = user.is_active === 1;
+  return (
+    <button
+      type="button"
+      onClick={onToggleActive}
+      disabled={disabled}
+      title={disabledTitle}
+      className={`rounded-full px-2 py-0.5 text-xs transition disabled:opacity-60 ${
+        active ? "bg-good/15 text-good hover:bg-good/25" : "bg-danger/15 text-danger hover:bg-danger/25"
+      }`}
+    >
+      {active ? "Active" : "Deactivated"}
+    </button>
+  );
+}
+
+// A per-user command center: everything the table row can do (role, status,
+// features, reset, delete) plus name/email/other details the row doesn't
+// show — all in one place, without touching the row-level controls, which
+// stay exactly where they were.
+function UserManagementModal({
+  user,
+  onClose,
+  onRoleChangeRequest,
+  onToggleActive,
+  onToggleFeature,
+  onResetPasswordRequest,
+  onDeleteRequest,
+}: {
+  user: AdminUser;
+  onClose: () => void;
+  onRoleChangeRequest: (role: "admin" | "user") => void;
+  onToggleActive: () => void;
+  onToggleFeature: (feature: FeatureKey) => void;
+  onResetPasswordRequest: () => void;
+  onDeleteRequest: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
+      <div
+        className="w-full max-w-md rounded-2xl border border-border bg-surface p-5 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <p className="text-sm font-medium text-foreground">{user.username}</p>
+        <p className="mt-1 text-xs text-muted">Visible only to you as an admin, and to this user.</p>
+
+        <div className="mt-3 divide-y divide-border">
+          <InfoRow label="Name" value={user.first_name || "—"} />
+          <InfoRow label="Email" value={user.email || "—"} />
+          <InfoRow label="Role" value={<RoleSelect user={user} disabled={false} onRoleChangeRequest={onRoleChangeRequest} />} />
+          <InfoRow label="Status" value={<StatusToggle user={user} disabled={false} onToggleActive={onToggleActive} />} />
+          <InfoRow label="Features" value={<FeaturesDropdown user={user} onToggleFeature={onToggleFeature} />} />
+          <InfoRow label="Saved location" value={user.location_count > 0 ? "Set" : "None"} />
+          <InfoRow label="Last login" value={formatDateTime(user.last_login)} />
+          <InfoRow label="Joined" value={formatDate(user.created_at)} />
+        </div>
+
+        <div className="mt-4 flex justify-between gap-2 border-t border-border pt-4">
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={onResetPasswordRequest}
+              className="rounded-lg border border-border px-3 py-1.5 text-xs text-foreground transition hover:border-accent"
+            >
+              Reset password
+            </button>
+            <button
+              type="button"
+              onClick={onDeleteRequest}
+              className="rounded-lg border border-danger/30 px-3 py-1.5 text-xs text-danger transition hover:bg-danger/10"
+            >
+              Delete
+            </button>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent-2"
+          >
+            Close
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -261,7 +422,7 @@ function FeaturesDropdown({
         <div
           ref={panelRef}
           style={{ position: "fixed", top: panelPos.top, left: panelPos.left }}
-          className="z-30 max-h-72 w-56 overflow-y-auto rounded-xl border border-border bg-surface-2 p-2 shadow-xl"
+          className="z-[60] max-h-72 w-56 overflow-y-auto rounded-xl border border-border bg-surface-2 p-2 shadow-xl"
         >
           <label className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-muted">
             <input type="checkbox" checked disabled className="accent-accent" />
@@ -296,11 +457,13 @@ function FeaturesDropdown({
 function ActionsMenu({
   disabled,
   disabledTitle,
+  onInfoRequest,
   onResetPasswordRequest,
   onDeleteRequest,
 }: {
   disabled: boolean;
   disabledTitle?: string;
+  onInfoRequest: () => void;
   onResetPasswordRequest: () => void;
   onDeleteRequest: () => void;
 }) {
@@ -361,6 +524,16 @@ function ActionsMenu({
             type="button"
             onClick={() => {
               setOpen(false);
+              onInfoRequest();
+            }}
+            className="block w-full rounded-lg px-3 py-2 text-left text-xs text-foreground hover:bg-accent/10"
+          >
+            More info
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setOpen(false);
               onResetPasswordRequest();
             }}
             className="block w-full rounded-lg px-3 py-2 text-left text-xs text-foreground hover:bg-accent/10"
@@ -391,6 +564,7 @@ function UserRowItem({
   onToggleFeature,
   onDeleteRequest,
   onResetPasswordRequest,
+  onInfoRequest,
 }: {
   user: AdminUser;
   isSelf: boolean;
@@ -399,40 +573,18 @@ function UserRowItem({
   onToggleFeature: (feature: FeatureKey) => void;
   onDeleteRequest: () => void;
   onResetPasswordRequest: () => void;
+  onInfoRequest: () => void;
 }) {
   const disabledTitle = isSelf ? "Manage your own account from Settings" : undefined;
-  const active = user.is_active === 1;
 
   return (
     <tr>
       <td className="px-4 py-3 text-foreground">{user.username}</td>
       <td className="px-4 py-3">
-        <select
-          value={user.role}
-          disabled={isSelf}
-          title={disabledTitle}
-          onChange={(e) => onRoleChangeRequest(e.target.value as "admin" | "user")}
-          className={`rounded-full border-0 px-2 py-0.5 text-xs outline-none disabled:opacity-60 ${
-            user.role === "admin" ? "bg-accent/15 text-accent-2" : "bg-surface-2 text-muted"
-          }`}
-        >
-          <option value="user">User</option>
-          <option value="admin">Admin</option>
-        </select>
+        <RoleSelect user={user} disabled={isSelf} disabledTitle={disabledTitle} onRoleChangeRequest={onRoleChangeRequest} />
       </td>
       <td className="px-4 py-3">
-        <button
-          onClick={onToggleActive}
-          disabled={isSelf}
-          title={disabledTitle}
-          className={`rounded-full px-2 py-0.5 text-xs transition disabled:opacity-60 ${
-            active
-              ? "bg-good/15 text-good hover:bg-good/25"
-              : "bg-danger/15 text-danger hover:bg-danger/25"
-          }`}
-        >
-          {active ? "Active" : "Deactivated"}
-        </button>
+        <StatusToggle user={user} disabled={isSelf} disabledTitle={disabledTitle} onToggleActive={onToggleActive} />
       </td>
       <td className="px-4 py-3">
         <FeaturesDropdown user={user} onToggleFeature={onToggleFeature} />
@@ -443,6 +595,7 @@ function UserRowItem({
         <ActionsMenu
           disabled={isSelf}
           disabledTitle={disabledTitle}
+          onInfoRequest={onInfoRequest}
           onResetPasswordRequest={onResetPasswordRequest}
           onDeleteRequest={onDeleteRequest}
         />

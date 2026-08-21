@@ -31,6 +31,7 @@ export async function POST(req: NextRequest) {
     theme: user.theme,
     timezone: user.timezone,
     timeFormat: user.time_format,
+    onboardingCompleted: user.onboarding_completed === 1,
   });
 
   return NextResponse.json({ ok: true, role: user.role, mustChangePassword: user.must_change_password === 1 });

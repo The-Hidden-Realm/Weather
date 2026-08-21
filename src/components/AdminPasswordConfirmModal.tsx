@@ -12,6 +12,7 @@ export function AdminPasswordConfirmModal({
   revealLabel = "Temporary password",
   onConfirm,
   onClose,
+  onCancel,
 }: {
   title: string;
   message: string;
@@ -20,12 +21,18 @@ export function AdminPasswordConfirmModal({
   revealLabel?: string;
   onConfirm: (adminPassword: string) => Promise<ConfirmResult>;
   onClose: () => void;
+  // Backing out before ever attempting the action (Cancel button, or
+  // clicking the backdrop while the password form is still up) — distinct
+  // from onClose, which fires once the action has actually gone through.
+  // Defaults to onClose so callers that don't care can ignore it.
+  onCancel?: () => void;
 }) {
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [revealValue, setRevealValue] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const cancel = onCancel ?? onClose;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -48,7 +55,10 @@ export function AdminPasswordConfirmModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+      onClick={revealValue ? onClose : cancel}
+    >
       <div
         className="w-full max-w-sm rounded-2xl border border-border bg-surface p-5 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
@@ -108,7 +118,7 @@ export function AdminPasswordConfirmModal({
             <div className="mt-4 flex justify-end gap-2">
               <button
                 type="button"
-                onClick={onClose}
+                onClick={cancel}
                 className="rounded-lg border border-border px-3 py-1.5 text-sm text-muted transition hover:border-accent hover:text-foreground"
               >
                 Cancel

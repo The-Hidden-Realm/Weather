@@ -3,6 +3,12 @@ import { SESSION_COOKIE_NAME, verifySessionToken } from "@/lib/session";
 
 const PUBLIC_PATHS = ["/login", "/signup"];
 
+// The onboarding page itself, plus the API routes it calls to look up and
+// save a home location — these must stay reachable while onboarding is
+// incomplete instead of being redirected like every other route.
+const ONBOARDING_PATH = "/onboarding";
+const ONBOARDING_API_PATHS = ["/api/onboarding", "/api/geocode", "/api/reverse-geocode", "/api/locations"];
+
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
@@ -31,6 +37,10 @@ export async function proxy(req: NextRequest) {
     // to ask for it again.
     if (pathname !== "/reset-password") {
       return NextResponse.redirect(new URL("/reset-password", req.url));
+    }
+  } else if (!session.onboardingCompleted) {
+    if (pathname !== ONBOARDING_PATH && !ONBOARDING_API_PATHS.includes(pathname)) {
+      return NextResponse.redirect(new URL(ONBOARDING_PATH, req.url));
     }
   }
 

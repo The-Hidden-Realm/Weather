@@ -37,6 +37,7 @@ export default function SignupPage() {
       window.location.href = "/";
     } catch {
       setError("Something went wrong. Try again.");
+    } finally {
       setLoading(false);
     }
   }
