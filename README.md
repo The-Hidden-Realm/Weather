@@ -83,6 +83,7 @@ exposed beyond your machine.
 | `ADMIN_USERNAME`       | Seeded admin's username. Defaults to `Admin`.                        |
 | `ADMIN_PASSWORD`       | Seeded admin's password (or use `ADMIN_PASSWORD_FILE` for a secret). |
 | `CONTACT_EMAIL`        | Optional — identifies this app to api.weather.gov per NWS etiquette. |
+| `SESSION_COOKIE_SECURE`| Set to `true` once a reverse proxy is terminating real HTTPS in front of the app. Leave `false` (default) for plain `http://ip:port` — a `Secure` cookie without TLS makes the browser silently drop it, which looks like login never completing. |
 | `DATA_DIR`             | Where the SQLite file lives. Defaults to `./data`.                   |
 
 Any `<VAR>_FILE` variable (e.g. `ADMIN_PASSWORD_FILE`) reads the value from
