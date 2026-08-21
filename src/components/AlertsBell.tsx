@@ -5,7 +5,9 @@ import type { NwsAlert } from "@/lib/weather/types";
 import { playAlertChime } from "@/lib/alertSound";
 import { AlertDetailModal } from "@/components/AlertDetailModal";
 
-const POLL_MS = 5 * 60 * 1000;
+// NWS doesn't push alerts, so this is a poll — kept short so a newly issued
+// warning shows up here within seconds rather than minutes.
+const POLL_MS = 30 * 1000;
 
 export function AlertsBell() {
   const [alerts, setAlerts] = useState<NwsAlert[]>([]);
@@ -39,11 +41,23 @@ export function AlertsBell() {
       }
     }
 
+    function onLocationChanged() {
+      // Whatever's showing right now is for the place that was open a
+      // moment ago — clear it immediately instead of waiting out the next
+      // poll, and re-baseline so the fresh fetch below doesn't chime for
+      // alerts that were already active at the new location.
+      seenIds.current = null;
+      setAlerts([]);
+      poll();
+    }
+
     poll();
+    window.addEventListener("weather-location-changed", onLocationChanged);
     const interval = setInterval(poll, POLL_MS);
     return () => {
       cancelled = true;
       clearInterval(interval);
+      window.removeEventListener("weather-location-changed", onLocationChanged);
     };
   }, []);
 
@@ -77,8 +91,13 @@ export function AlertsBell() {
 
       {open && (
         <div className="absolute left-0 z-30 mt-2 w-80 overflow-hidden rounded-xl border border-border bg-surface-2 shadow-xl">
-          <div className="border-b border-border px-3 py-2 text-xs font-medium uppercase tracking-wide text-muted">
-            Weather alerts
+          <div className="flex items-center justify-between border-b border-border px-3 py-2">
+            <span className="text-xs font-medium uppercase tracking-wide text-muted">Weather alerts</span>
+            {alerts.length > 0 && (
+              <button onClick={() => setAlerts([])} className="text-xs text-accent-2 hover:underline">
+                Clear all
+              </button>
+            )}
           </div>
           {alerts.length === 0 ? (
             <p className="px-3 py-4 text-sm text-muted">No active alerts for your location.</p>

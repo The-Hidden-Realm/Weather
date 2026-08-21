@@ -14,6 +14,10 @@ export type SessionPayload = {
   username: string;
   role: "admin" | "user";
   mustChangePassword: boolean;
+  // Which forced-password-change page to send the user to: the shipped
+  // default password asks for current + new; an admin-issued temp password
+  // asks only for new (they just used it to sign in).
+  mustChangePasswordReason: "default" | "admin_reset" | null;
   theme: "dark" | "light";
   // null = follow the current location's timezone instead of a fixed one.
   timezone: string | null;
@@ -41,6 +45,10 @@ export async function verifySessionToken(token: string): Promise<SessionPayload 
         username: payload.username,
         role: payload.role,
         mustChangePassword: payload.mustChangePassword === true,
+        mustChangePasswordReason:
+          payload.mustChangePasswordReason === "default" || payload.mustChangePasswordReason === "admin_reset"
+            ? payload.mustChangePasswordReason
+            : null,
         theme: payload.theme === "light" ? "light" : "dark",
         timezone: typeof payload.timezone === "string" ? payload.timezone : null,
         timeFormat: payload.timeFormat === "24h" ? "24h" : "12h",

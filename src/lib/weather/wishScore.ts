@@ -50,6 +50,19 @@ export const WISH_BANDS: {
   },
 ];
 
+// Overrides WISH_BANDS entirely whenever a life-threatening alert (a Tornado
+// Warning, or anything else this dangerous) is active. Unlike the bands
+// above, this isn't a score range — it's triggered by the alert itself, and
+// the score is left uncapped above 100 so it keeps climbing as other
+// conditions (wind, precip, storm activity) build on top of the threat,
+// instead of being squashed into a mid-scale band like "Active."
+export const LIFE_THREATENING_BAND = {
+  label: "Life-Threatening",
+  color: "danger" as WishScore["color"],
+  description:
+    "A Tornado Warning or similarly dangerous alert is active — take shelter now. The score has no ceiling here and keeps climbing as conditions worsen.",
+};
+
 // What feeds the score, in the order they're weighted — shown in the
 // "How to read" modal so the number isn't a black box.
 export const WISH_FACTOR_INFO: { label: string; description: string }[] = [
@@ -77,7 +90,7 @@ export const WISH_FACTOR_INFO: { label: string; description: string }[] = [
   {
     label: "Active alerts",
     description:
-      "National Weather Service watches, warnings, and advisories in effect here. A Warning outweighs a Watch or Advisory at the same severity, matching how NWS itself ranks urgency.",
+      "National Weather Service watches, warnings, and advisories in effect here. A Warning outweighs a Watch or Advisory at the same severity, matching how NWS itself ranks urgency. A Tornado Warning or similarly dangerous alert switches the whole score into Life-Threatening mode instead of just adding points.",
   },
 ];
 
@@ -105,6 +118,24 @@ function alertSeverityBase(severity: string | undefined): number {
     default:
       return 8;
   }
+}
+
+// Named event types that mean "take shelter now" on their own, regardless of
+// how NWS happened to tag severity/urgency on a given product.
+const LIFE_THREATENING_EVENTS = new Set([
+  "tornado warning",
+  "flash flood emergency",
+  "extreme wind warning",
+  "tsunami warning",
+  "particularly dangerous situation",
+]);
+
+function isLifeThreateningAlert(a: NwsAlert): boolean {
+  const event = a.event.toLowerCase();
+  if (LIFE_THREATENING_EVENTS.has(event)) return true;
+  // Catch-all: NWS reserves Extreme severity + Immediate urgency for
+  // warnings this serious even when the event name isn't in the list above.
+  return a.severity?.toLowerCase() === "extreme" && a.urgency?.toLowerCase() === "immediate" && event.includes("warning");
 }
 
 // WIS = Weather Intensity Score.
@@ -157,10 +188,16 @@ export function computeWishScore(
   }
   factors.push({ label: "Active alerts", contribution: alertScore });
 
-  const rawTotal = factors.reduce((sum, f) => sum + f.contribution, 0);
-  const score = Math.round(clamp(rawTotal, 0, 100));
+  const lifeThreatening = alerts.some(isLifeThreateningAlert);
 
-  const band = WISH_BANDS.find((b) => score >= b.min && score <= b.max) ?? WISH_BANDS[WISH_BANDS.length - 1];
+  const rawTotal = factors.reduce((sum, f) => sum + f.contribution, 0);
+  // A life-threatening alert overrides the normal 0-100 ceiling — the score
+  // keeps climbing as other conditions build instead of saturating at 100.
+  const score = Math.round(lifeThreatening ? Math.max(0, rawTotal) : clamp(rawTotal, 0, 100));
+
+  const band = lifeThreatening
+    ? LIFE_THREATENING_BAND
+    : WISH_BANDS.find((b) => score >= b.min && score <= b.max) ?? WISH_BANDS[WISH_BANDS.length - 1];
   const label = band.label;
   const color = band.color;
 

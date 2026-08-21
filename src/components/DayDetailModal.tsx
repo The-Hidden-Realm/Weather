@@ -4,12 +4,13 @@ import { useEffect } from "react";
 import type { DailyPoint, HourlyPoint } from "@/lib/weather/types";
 import { describeWeatherCode } from "@/lib/weather/wmo";
 import { WeatherIcon } from "@/components/WeatherIcon";
-import { formatDate, formatTime, formatTemp } from "@/lib/weather/format";
+import { formatDate, formatForecastTime, formatTemp } from "@/lib/weather/format";
 
 export function DayDetailModal({
   day,
   dayLabel,
   hourly,
+  sourceTimezone,
   timezone,
   hour12 = true,
   onClose,
@@ -17,6 +18,7 @@ export function DayDetailModal({
   day: DailyPoint;
   dayLabel: string;
   hourly: HourlyPoint[];
+  sourceTimezone: string;
   timezone: string;
   hour12?: boolean;
   onClose: () => void;
@@ -45,7 +47,7 @@ export function DayDetailModal({
             <WeatherIcon icon={icon} className="h-10 w-10" />
             <div>
               <p className="text-lg font-semibold text-foreground">
-                {dayLabel} · {formatDate(day.date, timezone)}
+                {dayLabel} · {formatDate(day.date)}
               </p>
               <p className="text-sm text-foreground/80">{description}</p>
             </div>
@@ -102,7 +104,9 @@ export function DayDetailModal({
             const { icon: hourIcon } = describeWeatherCode(h.weatherCode, h.isDay);
             return (
               <div key={h.time} className="flex items-center gap-3 py-2.5">
-                <span className="w-16 shrink-0 text-xs text-muted">{formatTime(h.time, timezone, hour12)}</span>
+                <span className="w-16 shrink-0 text-xs text-muted">
+                  {formatForecastTime(h.time, sourceTimezone, timezone, hour12)}
+                </span>
                 <WeatherIcon icon={hourIcon} className="h-7 w-7 shrink-0" />
                 <span className="w-10 flex-1 text-sm font-semibold text-foreground">
                   {formatTemp(h.temperature)}

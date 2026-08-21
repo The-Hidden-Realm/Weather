@@ -27,7 +27,10 @@ export function CurrentConditionsCard({
     { label: "Wind", value: `${formatWind(current.windSpeed)} ${compassDirection(current.windDirection)}` },
     { label: "Humidity", value: `${Math.round(current.humidity)}%` },
     { label: "Visibility", value: formatVisibility(current.visibility) },
-    { label: "Pressure", value: formatPressure(current.pressure) },
+    {
+      label: "Pressure",
+      value: `${formatPressure(current.pressure)} · ${current.pressureTrend === "low" ? "Low" : "High"}`,
+    },
     { label: "Precipitation", value: current.precipitation > 0 ? `${current.precipitation.toFixed(2)} in` : "0 in" },
   ];
 
@@ -58,6 +61,7 @@ export function CurrentConditionsCard({
       <SunriseSunsetTiles
         sunrise={data.sunrise}
         sunset={data.sunset}
+        sourceTimezone={data.location.timezone}
         timezone={timezone}
         hour12={hour12}
         className="mt-3 lg:hidden"

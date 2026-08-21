@@ -1,14 +1,18 @@
 import type { HourlyPoint } from "@/lib/weather/types";
 import { describeWeatherCode } from "@/lib/weather/wmo";
 import { WeatherIcon } from "@/components/WeatherIcon";
-import { formatTime, formatTemp } from "@/lib/weather/format";
+import { formatForecastTime, formatTemp } from "@/lib/weather/format";
 
 export function HourlyForecast({
   hourly,
+  sourceTimezone,
   timezone,
   hour12 = true,
 }: {
   hourly: HourlyPoint[];
+  // The location's own timezone — what each `h.time` naive string is
+  // actually expressed in, regardless of `timezone` (the display preference).
+  sourceTimezone: string;
   timezone: string;
   hour12?: boolean;
 }) {
@@ -21,7 +25,7 @@ export function HourlyForecast({
           return (
             <div key={h.time} className="flex items-center gap-3 py-2.5">
               <span className="w-16 shrink-0 text-xs text-muted">
-                {i === 0 ? "Now" : formatTime(h.time, timezone, hour12)}
+                {i === 0 ? "Now" : formatForecastTime(h.time, sourceTimezone, timezone, hour12)}
               </span>
               <WeatherIcon icon={icon} className="h-7 w-7 shrink-0" />
               <span className="w-10 flex-1 text-sm font-semibold text-foreground">

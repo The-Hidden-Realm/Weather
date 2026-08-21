@@ -1,19 +1,7 @@
-import { randomBytes } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
-import { getSessionUser, findUserById, adminResetPassword } from "@/lib/auth";
+import { getSessionUser, findUserById, adminResetPassword, verifyAdminPassword, generateTempPassword } from "@/lib/auth";
 
-const TEMP_PASSWORD_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
-
-function generateTempPassword(length = 14): string {
-  const bytes = randomBytes(length);
-  let out = "";
-  for (let i = 0; i < length; i++) {
-    out += TEMP_PASSWORD_ALPHABET[bytes[i] % TEMP_PASSWORD_ALPHABET.length];
-  }
-  return out;
-}
-
-export async function POST(_req: NextRequest, ctx: RouteContext<"/api/admin/users/[id]/reset-password">) {
+export async function POST(req: NextRequest, ctx: RouteContext<"/api/admin/users/[id]/reset-password">) {
   const session = await getSessionUser();
   if (!session || session.role !== "admin") {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -34,6 +22,11 @@ export async function POST(_req: NextRequest, ctx: RouteContext<"/api/admin/user
 
   const target = findUserById(userId);
   if (!target) return NextResponse.json({ error: "User not found." }, { status: 404 });
+
+  const body = await req.json().catch(() => ({}));
+  if (!verifyAdminPassword(session, body.adminPassword)) {
+    return NextResponse.json({ error: "Incorrect password." }, { status: 403 });
+  }
 
   const tempPassword = generateTempPassword();
   adminResetPassword(target.id, tempPassword);

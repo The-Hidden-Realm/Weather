@@ -8,7 +8,12 @@ export type CurrentConditions = {
   windDirection: number;
   windGust: number | null;
   humidity: number;
+  // Raw station pressure in hPa, uncorrected for elevation — matches what
+  // a barometer at this location actually reads.
   pressure: number;
+  // Relative to the standard atmosphere pressure expected at this
+  // location's elevation, not the flat 1013.25 hPa sea-level constant.
+  pressureTrend: "low" | "high";
   visibility: number | null;
   precipitation: number;
   cloudCover: number;
@@ -57,7 +62,9 @@ export type NwsAlert = {
 };
 
 export type WishScore = {
-  score: number; // 0-100
+  // 0-100 normally, but uncapped above 100 when label is "Life-Threatening"
+  // (an active Tornado Warning or similarly dangerous alert).
+  score: number;
   label: string;
   color: "good" | "warn" | "danger";
   factors: { label: string; contribution: number }[];

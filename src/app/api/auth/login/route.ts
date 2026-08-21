@@ -24,6 +24,10 @@ export async function POST(req: NextRequest) {
     username: user.username,
     role: user.role,
     mustChangePassword: user.must_change_password === 1,
+    mustChangePasswordReason:
+      user.must_change_password_reason === "default" || user.must_change_password_reason === "admin_reset"
+        ? user.must_change_password_reason
+        : null,
     theme: user.theme,
     timezone: user.timezone,
     timeFormat: user.time_format,

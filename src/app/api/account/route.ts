@@ -79,6 +79,10 @@ export async function PATCH(req: NextRequest) {
     username,
     role: user.role,
     mustChangePassword: user.must_change_password === 1,
+    mustChangePasswordReason:
+      user.must_change_password_reason === "default" || user.must_change_password_reason === "admin_reset"
+        ? user.must_change_password_reason
+        : null,
     theme,
     timezone,
     timeFormat,

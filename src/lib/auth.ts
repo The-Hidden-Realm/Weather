@@ -1,4 +1,5 @@
 import bcrypt from "bcryptjs";
+import { randomBytes } from "node:crypto";
 import { getDb, type UserRow } from "@/lib/db";
 import { getSessionUser, clearSessionCookie, type SessionPayload } from "@/lib/session";
 
@@ -12,9 +13,17 @@ export {
   type SessionPayload,
 } from "@/lib/session";
 
-// Re-checks the DB (not just the JWT) so an admin deactivating an account
-// takes effect on this user's very next page load, not just their next login.
-export async function getActiveSessionUser(): Promise<SessionPayload | null> {
+export { AVAILABLE_FEATURES, getUserFeatures, type FeatureKey } from "@/lib/features";
+import { getUserFeatures, type FeatureKey } from "@/lib/features";
+
+export function setUserFeatures(userId: number, features: FeatureKey[]) {
+  getDb().prepare("UPDATE users SET enabled_features = ? WHERE id = ?").run(JSON.stringify(features), userId);
+}
+
+// Re-checks the DB (not just the JWT) so an admin deactivating an account, or
+// changing feature access, takes effect on this user's very next page load,
+// not just their next login.
+export async function getActiveSessionUser(): Promise<(SessionPayload & { enabledFeatures: FeatureKey[] }) | null> {
   const session = await getSessionUser();
   if (!session) return null;
   const user = findUserById(session.userId);
@@ -22,7 +31,7 @@ export async function getActiveSessionUser(): Promise<SessionPayload | null> {
     await clearSessionCookie();
     return null;
   }
-  return session;
+  return { ...session, enabledFeatures: getUserFeatures(user) };
 }
 
 export function findUserByUsername(username: string): UserRow | undefined {
@@ -48,10 +57,20 @@ export function verifyPassword(user: UserRow, password: string): boolean {
   return bcrypt.compareSync(password, user.password_hash);
 }
 
+// Verifies the acting admin's own password, used to confirm sensitive
+// actions (delete user, change role, reset password) before they apply.
+export function verifyAdminPassword(session: SessionPayload, password: string): boolean {
+  if (typeof password !== "string" || !password) return false;
+  const admin = findUserById(session.userId);
+  return !!admin && verifyPassword(admin, password);
+}
+
 export function updatePassword(userId: number, newPassword: string) {
   const hash = bcrypt.hashSync(newPassword, 10);
   getDb()
-    .prepare("UPDATE users SET password_hash = ?, must_change_password = 0 WHERE id = ?")
+    .prepare(
+      "UPDATE users SET password_hash = ?, must_change_password = 0, must_change_password_reason = NULL WHERE id = ?"
+    )
     .run(hash, userId);
 }
 
@@ -98,8 +117,23 @@ export function setUserRole(userId: number, role: "admin" | "user") {
 export function adminResetPassword(userId: number, tempPassword: string) {
   const hash = bcrypt.hashSync(tempPassword, 10);
   getDb()
-    .prepare("UPDATE users SET password_hash = ?, must_change_password = 1 WHERE id = ?")
+    .prepare(
+      "UPDATE users SET password_hash = ?, must_change_password = 1, must_change_password_reason = 'admin_reset' WHERE id = ?"
+    )
     .run(hash, userId);
+}
+
+const TEMP_PASSWORD_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+
+// Used both for admin-triggered single resets and for accounts recreated
+// during a backup restore — same "shown once" contract either way.
+export function generateTempPassword(length = 14): string {
+  const bytes = randomBytes(length);
+  let out = "";
+  for (let i = 0; i < length; i++) {
+    out += TEMP_PASSWORD_ALPHABET[bytes[i] % TEMP_PASSWORD_ALPHABET.length];
+  }
+  return out;
 }
 
 export function deleteUser(userId: number) {

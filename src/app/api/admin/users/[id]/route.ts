@@ -1,5 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSessionUser, findUserById, setUserActive, setUserRole, deleteUser } from "@/lib/auth";
+import {
+  getSessionUser,
+  findUserById,
+  setUserActive,
+  setUserRole,
+  setUserFeatures,
+  deleteUser,
+  verifyAdminPassword,
+  AVAILABLE_FEATURES,
+  type FeatureKey,
+} from "@/lib/auth";
 
 export async function PATCH(req: NextRequest, ctx: RouteContext<"/api/admin/users/[id]">) {
   const session = await getSessionUser();
@@ -16,16 +26,20 @@ export async function PATCH(req: NextRequest, ctx: RouteContext<"/api/admin/user
   const target = findUserById(userId);
   if (!target) return NextResponse.json({ error: "User not found." }, { status: 404 });
 
-  if (target.id === session.userId) {
+  const body = await req.json();
+
+  const changesRoleOrStatus = body.role !== undefined || typeof body.isActive === "boolean";
+  if (target.id === session.userId && changesRoleOrStatus) {
     return NextResponse.json(
       { error: "You can't change your own role or active status here — use Settings." },
       { status: 400 }
     );
   }
 
-  const body = await req.json();
-
   if (body.role === "admin" || body.role === "user") {
+    if (!verifyAdminPassword(session, body.adminPassword)) {
+      return NextResponse.json({ error: "Incorrect password." }, { status: 403 });
+    }
     setUserRole(target.id, body.role);
   }
 
@@ -33,14 +47,21 @@ export async function PATCH(req: NextRequest, ctx: RouteContext<"/api/admin/user
     setUserActive(target.id, body.isActive);
   }
 
+  if (Array.isArray(body.features)) {
+    const features = body.features.filter((f: unknown): f is FeatureKey =>
+      (AVAILABLE_FEATURES as readonly string[]).includes(f as string)
+    );
+    setUserFeatures(target.id, features);
+  }
+
   const updated = findUserById(target.id)!;
   return NextResponse.json({
     ok: true,
-    user: { id: updated.id, role: updated.role, isActive: updated.is_active === 1 },
+    user: { id: updated.id, role: updated.role, isActive: updated.is_active === 1, features: updated.enabled_features },
   });
 }
 
-export async function DELETE(_req: NextRequest, ctx: RouteContext<"/api/admin/users/[id]">) {
+export async function DELETE(req: NextRequest, ctx: RouteContext<"/api/admin/users/[id]">) {
   const session = await getSessionUser();
   if (!session || session.role !== "admin") {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -58,6 +79,11 @@ export async function DELETE(_req: NextRequest, ctx: RouteContext<"/api/admin/us
 
   const target = findUserById(userId);
   if (!target) return NextResponse.json({ error: "User not found." }, { status: 404 });
+
+  const body = await req.json().catch(() => ({}));
+  if (!verifyAdminPassword(session, body.adminPassword)) {
+    return NextResponse.json({ error: "Incorrect password." }, { status: 403 });
+  }
 
   deleteUser(userId);
   return NextResponse.json({ ok: true });

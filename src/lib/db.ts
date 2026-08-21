@@ -42,6 +42,31 @@ function ensureMustChangePasswordColumn(db: Database.Database) {
   }
 }
 
+// Distinguishes *why* must_change_password is set, so the proxy can send the
+// user to the right page: the shipped default password (asks for current +
+// new password) vs. an admin-issued temp password (asks only for new — the
+// temp password was just used to sign in, re-asking for it is redundant).
+function ensureMustChangePasswordReasonColumn(db: Database.Database) {
+  const columns = db.prepare("PRAGMA table_info(users)").all() as { name: string }[];
+  if (columns.some((c) => c.name === "must_change_password_reason")) return;
+  db.exec("ALTER TABLE users ADD COLUMN must_change_password_reason TEXT");
+  db.exec(
+    "UPDATE users SET must_change_password_reason = 'default' WHERE must_change_password = 1"
+  );
+}
+
+// Per-user opt-in feature flags shown as nav links (Home is unconditional for
+// everyone, so it isn't tracked here). Replaces the old "Locations" admin
+// column.
+function ensureFeatureColumn(db: Database.Database) {
+  const columns = db.prepare("PRAGMA table_info(users)").all() as { name: string }[];
+  if (columns.some((c) => c.name === "enabled_features")) return;
+  db.exec("ALTER TABLE users ADD COLUMN enabled_features TEXT NOT NULL DEFAULT '[]'");
+  // Cameras already shipped as an unconditional feature before this column
+  // existed — preserve access for everyone who already had it.
+  db.exec(`UPDATE users SET enabled_features = '["cameras"]'`);
+}
+
 function ensureThemeColumn(db: Database.Database) {
   const columns = db.prepare("PRAGMA table_info(users)").all() as { name: string }[];
   if (columns.some((c) => c.name === "theme")) return;
@@ -184,9 +209,23 @@ function init(): Database.Database {
       camera_id INTEGER REFERENCES cameras(id) ON DELETE SET NULL,
       PRIMARY KEY (user_id, slot)
     );
+
+    -- One-time links for accounts recreated by a backup restore (their real
+    -- password was never backed up). Only a hash of the token is stored, so
+    -- a DB leak alone can't be used to redeem a still-valid link.
+    CREATE TABLE IF NOT EXISTS recovery_tokens (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      token_hash TEXT NOT NULL UNIQUE,
+      expires_at TEXT NOT NULL,
+      used_at TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
   `);
 
   ensureMustChangePasswordColumn(db);
+  ensureMustChangePasswordReasonColumn(db);
+  ensureFeatureColumn(db);
   ensureThemeColumn(db);
   ensureLocationDetailColumns(db);
   ensureUserPreferenceColumns(db);
@@ -203,9 +242,10 @@ function init(): Database.Database {
     const adminPassword = readSecret("ADMIN_PASSWORD", DEFAULT_ADMIN_PASSWORD)!;
     const hash = bcrypt.hashSync(adminPassword, 10);
     const mustChange = adminPassword === DEFAULT_ADMIN_PASSWORD ? 1 : 0;
+    const mustChangeReason = mustChange ? "default" : null;
     db.prepare(
-      "INSERT INTO users (username, password_hash, role, must_change_password) VALUES (?, ?, 'admin', ?)"
-    ).run(adminUsername, hash, mustChange);
+      "INSERT INTO users (username, password_hash, role, must_change_password, must_change_password_reason) VALUES (?, ?, 'admin', ?, ?)"
+    ).run(adminUsername, hash, mustChange, mustChangeReason);
     console.log(`[db] Seeded admin account "${adminUsername}"`);
   }
 
@@ -225,6 +265,8 @@ export type UserRow = {
   password_hash: string;
   role: "admin" | "user";
   must_change_password: number;
+  must_change_password_reason: string | null;
+  enabled_features: string;
   theme: "dark" | "light";
   timezone: string | null;
   time_format: "12h" | "24h";
@@ -259,4 +301,13 @@ export type CameraLayoutRow = {
   user_id: number;
   slot: number;
   camera_id: number | null;
+};
+
+export type RecoveryTokenRow = {
+  id: number;
+  user_id: number;
+  token_hash: string;
+  expires_at: string;
+  used_at: string | null;
+  created_at: string;
 };

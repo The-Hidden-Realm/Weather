@@ -4,12 +4,25 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import type { SessionPayload } from "@/lib/session";
+import type { FeatureKey } from "@/lib/features";
 import { AlertsBell } from "@/components/AlertsBell";
 
-const NAV_LINKS = [
-  { href: "/", label: "Home" },
-  { href: "/cameras", label: "Cameras" },
+const NAV_LINKS: { href: string; label: string; feature: FeatureKey | null }[] = [
+  { href: "/", label: "Home", feature: null },
+  { href: "/cameras", label: "Cameras", feature: "cameras" },
 ];
+
+const TOOLS_LINKS: { href: string; label: string; feature: FeatureKey }[] = [
+  { href: "/tools/weather-alerts", label: "Weather Alerts", feature: "weather-alerts" },
+  { href: "/tools/spc-outlooks", label: "NWS SPC Outlooks", feature: "spc-outlooks" },
+  { href: "/tools/hurricane-tracker", label: "Hurricane Tracker", feature: "hurricane-tracker" },
+  { href: "/tools/storm-prediction", label: "Storm Prediction", feature: "storm-prediction" },
+  { href: "/tools/outdoor-activity", label: "Outdoor Activity Planning", feature: "outdoor-activity" },
+];
+
+// Keeps nav links in sync with an admin toggling this user's features while
+// their tab is already open, instead of only picking it up on next load.
+const FEATURE_POLL_MS = 3000;
 
 function NavLink({ href, label, active }: { href: string; label: string; active: boolean }) {
   return (
@@ -24,20 +37,50 @@ function NavLink({ href, label, active }: { href: string; label: string; active:
   );
 }
 
-export function TopNav({ session }: { session: SessionPayload }) {
+export function TopNav({ session }: { session: SessionPayload & { enabledFeatures: FeatureKey[] } }) {
   const router = useRouter();
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const [toolsOpen, setToolsOpen] = useState(false);
+  const [enabledFeatures, setEnabledFeatures] = useState(session.enabledFeatures);
   const menuRef = useRef<HTMLDivElement>(null);
+  const toolsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     function onClickOutside(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (menuRef.current && !menuRef.current.contains(target)) {
         setOpen(false);
+      }
+      if (toolsRef.current && !toolsRef.current.contains(target)) {
+        setToolsOpen(false);
       }
     }
     document.addEventListener("mousedown", onClickOutside);
     return () => document.removeEventListener("mousedown", onClickOutside);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function poll() {
+      try {
+        const res = await fetch("/api/session/features");
+        if (!res.ok || cancelled) return;
+        const data = await res.json();
+        if (!cancelled && Array.isArray(data.enabledFeatures)) {
+          setEnabledFeatures(data.enabledFeatures);
+        }
+      } catch {
+        // Network hiccup — just try again on the next poll.
+      }
+    }
+
+    const interval = setInterval(poll, FEATURE_POLL_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
   }, []);
 
   async function handleLogout() {
@@ -45,6 +88,8 @@ export function TopNav({ session }: { session: SessionPayload }) {
     router.push("/login");
     router.refresh();
   }
+
+  const visibleToolsLinks = TOOLS_LINKS.filter((link) => enabledFeatures.includes(link.feature));
 
   return (
     <header className="border-b border-border">
@@ -59,9 +104,50 @@ export function TopNav({ session }: { session: SessionPayload }) {
         </Link>
 
         <nav className="flex items-center gap-1">
-          {NAV_LINKS.map((link) => (
+          {NAV_LINKS.filter((link) => !link.feature || enabledFeatures.includes(link.feature)).map((link) => (
             <NavLink key={link.href} href={link.href} label={link.label} active={pathname === link.href} />
           ))}
+
+          {visibleToolsLinks.length > 0 && (
+            <div ref={toolsRef} className="relative">
+              <button
+                onClick={() => setToolsOpen((o) => !o)}
+                className={`flex items-center gap-1 rounded-lg px-3 py-1.5 text-sm font-medium transition ${
+                  toolsOpen || visibleToolsLinks.some((l) => pathname === l.href)
+                    ? "bg-accent/15 text-accent-2"
+                    : "text-muted hover:bg-surface-2 hover:text-foreground"
+                }`}
+              >
+                Tools
+                <svg
+                  width="10"
+                  height="10"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  className={`transition-transform ${toolsOpen ? "rotate-180" : ""}`}
+                >
+                  <path d="m6 9 6 6 6-6" />
+                </svg>
+              </button>
+
+              {toolsOpen && (
+                <div className="absolute left-0 z-30 mt-2 w-56 overflow-hidden rounded-xl border border-border bg-surface-2 shadow-xl">
+                  {visibleToolsLinks.map((link) => (
+                    <Link
+                      key={link.href}
+                      href={link.href}
+                      onClick={() => setToolsOpen(false)}
+                      className="block px-3 py-2.5 text-sm text-foreground hover:bg-accent/10"
+                    >
+                      {link.label}
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </nav>
 
         <div className="ml-auto flex items-center gap-3">

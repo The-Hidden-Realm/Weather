@@ -172,6 +172,28 @@ export function Dashboard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location, effectiveTimezone]);
 
+  useEffect(() => {
+    // The quarter-hour timer above only fires reliably while this tab is in
+    // the foreground — browsers throttle or pause setTimeout in backgrounded
+    // tabs, so a tab left open but unfocused can drift and keep showing data
+    // from an earlier window. Catch up the moment the tab is looked at again
+    // instead of waiting for the next scheduled tick.
+    if (!location || !effectiveTimezone || !weather) return;
+    function refreshIfStale() {
+      if (document.visibilityState !== "visible" || !weather || !location) return;
+      const fetchedBucket = quarterHourBucket(effectiveTimezone!, new Date(weather.fetchedAt).getTime());
+      if (fetchedBucket !== quarterHourBucket(effectiveTimezone!)) {
+        loadWeather(location);
+      }
+    }
+    document.addEventListener("visibilitychange", refreshIfStale);
+    window.addEventListener("focus", refreshIfStale);
+    return () => {
+      document.removeEventListener("visibilitychange", refreshIfStale);
+      window.removeEventListener("focus", refreshIfStale);
+    };
+  }, [location, effectiveTimezone, weather, loadWeather]);
+
   function handleManualRefresh() {
     // Admin-only, and scoped to this browser session: every fetch already
     // hits the API fresh with no shared cache, so this never touches what
@@ -210,6 +232,9 @@ export function Dashboard({
     }
     const data = await res.json();
     setLocation(data.location);
+    // AlertsBell lives in TopNav, a sibling of this component — a window
+    // event is the simplest way to tell it its alerts are now stale.
+    window.dispatchEvent(new Event("weather-location-changed"));
   }
 
   return (
@@ -259,6 +284,7 @@ export function Dashboard({
                 <SunriseSunsetTiles
                   sunrise={weather.sunrise}
                   sunset={weather.sunset}
+                  sourceTimezone={weather.location.timezone}
                   timezone={effectiveTimezone}
                   hour12={hour12}
                   className="w-full"
@@ -270,6 +296,7 @@ export function Dashboard({
               <SevenDayForecast
                 daily={weather.daily}
                 hourly={weather.hourly}
+                sourceTimezone={weather.location.timezone}
                 timezone={effectiveTimezone}
                 hour12={hour12}
               />
@@ -279,6 +306,7 @@ export function Dashboard({
           <div className="min-w-0">
             <HourlyForecast
               hourly={weather.hourly.slice(0, 12)}
+              sourceTimezone={weather.location.timezone}
               timezone={effectiveTimezone}
               hour12={hour12}
             />

@@ -29,6 +29,7 @@ export async function POST(req: NextRequest) {
     username: user.username,
     role: user.role,
     mustChangePassword: false,
+    mustChangePasswordReason: null,
     theme: user.theme,
     timezone: user.timezone,
     timeFormat: user.time_format,

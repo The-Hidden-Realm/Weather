@@ -5,6 +5,7 @@ const GEOCODE_URL = "https://geocoding-api.open-meteo.com/v1/search";
 
 type RawForecast = {
   timezone: string;
+  elevation: number;
   current: {
     time: string;
     temperature_2m: number;
@@ -14,7 +15,7 @@ type RawForecast = {
     precipitation: number;
     weather_code: number;
     cloud_cover: number;
-    pressure_msl: number;
+    surface_pressure: number;
     wind_speed_10m: number;
     wind_direction_10m: number;
     wind_gusts_10m: number;
@@ -47,6 +48,16 @@ type RawForecast = {
   };
 };
 
+const STANDARD_SEA_LEVEL_HPA = 1013.25;
+
+// Barometric formula for the standard atmosphere — gives the pressure a
+// "normal" day would read at a given elevation, so raw station pressure
+// (which drops ~12 hPa per 100m of elevation) can be compared against a
+// baseline that accounts for where the station actually sits.
+function standardPressureAtElevation(elevationMeters: number): number {
+  return STANDARD_SEA_LEVEL_HPA * Math.pow(1 - (2.25577e-5 * elevationMeters), 5.25588);
+}
+
 export async function fetchOpenMeteoForecast(
   lat: number,
   lon: number
@@ -72,7 +83,7 @@ export async function fetchOpenMeteoForecast(
       "precipitation",
       "weather_code",
       "cloud_cover",
-      "pressure_msl",
+      "surface_pressure",
       "wind_speed_10m",
       "wind_direction_10m",
       "wind_gusts_10m",
@@ -124,7 +135,9 @@ export async function fetchOpenMeteoForecast(
     windDirection: raw.current.wind_direction_10m,
     windGust: raw.current.wind_gusts_10m ?? null,
     humidity: raw.current.relative_humidity_2m,
-    pressure: raw.current.pressure_msl,
+    pressure: raw.current.surface_pressure,
+    pressureTrend:
+      raw.current.surface_pressure < standardPressureAtElevation(raw.elevation) ? "low" : "high",
     visibility: visibilityMeters,
     precipitation: raw.current.precipitation,
     cloudCover: raw.current.cloud_cover,

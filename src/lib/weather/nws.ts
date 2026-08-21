@@ -12,7 +12,9 @@ export async function fetchNwsAlerts(lat: number, lon: number): Promise<{ alerts
           : USER_AGENT,
         Accept: "application/geo+json",
       },
-      next: { revalidate: 300 },
+      // Short TTL so a newly issued warning reaches users within the poll
+      // interval instead of waiting out a stale cached response too.
+      next: { revalidate: 30 },
     });
     if (!res.ok) return { alerts: [], ok: false };
     const data = await res.json();

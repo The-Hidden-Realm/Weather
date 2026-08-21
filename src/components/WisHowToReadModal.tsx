@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { WISH_BANDS, WISH_FACTOR_INFO } from "@/lib/weather/wishScore";
+import { WISH_BANDS, WISH_FACTOR_INFO, LIFE_THREATENING_BAND } from "@/lib/weather/wishScore";
 
 const COLOR_VAR: Record<string, string> = {
   good: "var(--good)",
@@ -80,6 +80,26 @@ export function WisHowToReadModal({
               </div>
             );
           })}
+
+          <div
+            className={`flex items-start gap-3 rounded-xl border p-3 ${
+              currentScore > 100 ? "border-danger bg-danger/10" : "border-border/60 bg-surface-2/60"
+            }`}
+          >
+            <span
+              className="mt-0.5 shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium"
+              style={{ background: `${COLOR_VAR[LIFE_THREATENING_BAND.color]}22`, color: COLOR_VAR[LIFE_THREATENING_BAND.color] }}
+            >
+              100+
+            </span>
+            <div>
+              <p className="text-sm font-medium text-foreground">
+                {LIFE_THREATENING_BAND.label}
+                {currentScore > 100 && <span className="ml-2 text-xs font-normal text-accent-2">Current</span>}
+              </p>
+              <p className="text-xs text-muted">{LIFE_THREATENING_BAND.description}</p>
+            </div>
+          </div>
         </div>
 
         <div className="space-y-3 p-5">

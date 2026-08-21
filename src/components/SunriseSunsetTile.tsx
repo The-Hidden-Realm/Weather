@@ -1,14 +1,16 @@
-import { formatTime } from "@/lib/weather/format";
+import { formatForecastTime } from "@/lib/weather/format";
 
 export function SunriseSunsetTiles({
   sunrise,
   sunset,
+  sourceTimezone,
   timezone,
   hour12 = true,
   className = "",
 }: {
   sunrise: string;
   sunset: string;
+  sourceTimezone: string;
   timezone: string;
   hour12?: boolean;
   className?: string;
@@ -16,7 +18,7 @@ export function SunriseSunsetTiles({
   const items = [
     {
       label: "Sunrise",
-      value: sunrise ? formatTime(sunrise, timezone, hour12) : "—",
+      value: sunrise ? formatForecastTime(sunrise, sourceTimezone, timezone, hour12) : "—",
       icon: (
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--warn)" strokeWidth="1.8">
           <path d="M12 2v5M4.9 8.9 6.3 10.3M19.1 8.9 17.7 10.3M2 16h2M20 16h2M6 16a6 6 0 0 1 12 0M4 20h16" />
@@ -25,7 +27,7 @@ export function SunriseSunsetTiles({
     },
     {
       label: "Sunset",
-      value: sunset ? formatTime(sunset, timezone, hour12) : "—",
+      value: sunset ? formatForecastTime(sunset, sourceTimezone, timezone, hour12) : "—",
       icon: (
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent-2)" strokeWidth="1.8">
           <path d="M12 9V4M4.9 8.9 6.3 10.3M19.1 8.9 17.7 10.3M2 16h2M20 16h2M6 16a6 6 0 0 1 12 0M4 20h16" />

@@ -10,11 +10,13 @@ import { formatDay, formatTemp } from "@/lib/weather/format";
 export function SevenDayForecast({
   daily,
   hourly,
+  sourceTimezone,
   timezone,
   hour12 = true,
 }: {
   daily: DailyPoint[];
   hourly: HourlyPoint[];
+  sourceTimezone: string;
   timezone: string;
   hour12?: boolean;
 }) {
@@ -26,7 +28,7 @@ export function SevenDayForecast({
       <div className="flex gap-3 overflow-x-auto pb-1">
         {daily.map((d, i) => {
           const { description, icon } = describeWeatherCode(d.weatherCode, true);
-          const label = i === 0 ? "Today" : formatDay(d.date, timezone);
+          const label = i === 0 ? "Today" : formatDay(d.date);
           return (
             <button
               key={d.date}
@@ -61,6 +63,7 @@ export function SevenDayForecast({
           day={selected.day}
           dayLabel={selected.label}
           hourly={hourly.filter((h) => h.time.startsWith(selected.day.date))}
+          sourceTimezone={sourceTimezone}
           timezone={timezone}
           hour12={hour12}
           onClose={() => setSelected(null)}

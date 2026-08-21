@@ -8,6 +8,7 @@ export async function proxy(req: NextRequest) {
 
   if (
     PUBLIC_PATHS.includes(pathname) ||
+    pathname.startsWith("/recover/") ||
     pathname.startsWith("/api/auth") ||
     pathname.startsWith("/_next") ||
     pathname === "/favicon.ico"
@@ -24,8 +25,11 @@ export async function proxy(req: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  if (session.mustChangePassword && pathname !== "/change-password") {
-    return NextResponse.redirect(new URL("/change-password", req.url));
+  if (session.mustChangePassword) {
+    const target = session.mustChangePasswordReason === "admin_reset" ? "/reset-password" : "/change-password";
+    if (pathname !== target) {
+      return NextResponse.redirect(new URL(target, req.url));
+    }
   }
 
   if (pathname.startsWith("/admin") && session.role !== "admin") {

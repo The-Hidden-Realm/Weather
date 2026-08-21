@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { WishScore } from "@/lib/weather/types";
-import { WISH_BANDS } from "@/lib/weather/wishScore";
+import { WISH_BANDS, LIFE_THREATENING_BAND } from "@/lib/weather/wishScore";
 import { WisHowToReadModal } from "@/components/WisHowToReadModal";
 
 const COLOR_VAR: Record<WishScore["color"], string> = {
@@ -28,7 +28,10 @@ export function WishGauge({ wish }: { wish: WishScore }) {
 
   const radius = 54;
   const circumference = 2 * Math.PI * radius;
-  const offset = circumference * (1 - wish.score / 100);
+  const isLifeThreatening = wish.label === LIFE_THREATENING_BAND.label;
+  // The ring itself tops out at 100% full even when the underlying score
+  // climbs past 100 in life-threatening mode — the number keeps counting up.
+  const offset = circumference * (1 - Math.min(wish.score, 100) / 100);
   const color = COLOR_VAR[wish.color];
 
   return (
@@ -88,23 +91,47 @@ export function WishGauge({ wish }: { wish: WishScore }) {
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center">
             <span className="text-3xl font-semibold text-foreground">{wish.score}</span>
-            <span className="text-[10px] uppercase tracking-wide text-muted">/ 100</span>
+            <span className="text-[10px] uppercase tracking-wide text-muted">
+              {isLifeThreatening ? "Uncapped" : "/ 100"}
+            </span>
           </div>
         </div>
 
         <div>
           <div
-            className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium"
+            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium ${
+              isLifeThreatening ? "animate-pulse" : ""
+            }`}
             style={{ background: `${color}22`, color }}
           >
             <span className="h-1.5 w-1.5 rounded-full" style={{ background: color }} />
             {wish.label}
           </div>
           <p className="mt-2 max-w-[16rem] text-sm text-muted">
-            {WISH_BANDS.find((b) => b.label === wish.label)?.description}
+            {isLifeThreatening
+              ? LIFE_THREATENING_BAND.description
+              : WISH_BANDS.find((b) => b.label === wish.label)?.description}
           </p>
         </div>
       </div>
+
+      {isLifeThreatening && (
+        <p className="mt-4 flex items-start gap-2 rounded-xl border border-danger/40 bg-danger/10 p-3 text-xs text-danger">
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            className="mt-0.5 shrink-0"
+          >
+            <path d="M12 9v4M12 17h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" />
+          </svg>
+          Life-threatening weather in progress — take shelter now. This score has no ceiling and will keep
+          climbing as conditions worsen.
+        </p>
+      )}
 
       {wish.alertsUnavailable && (
         <p className="mt-4 flex items-start gap-2 rounded-xl border border-warn/40 bg-warn/10 p-3 text-xs text-warn">
