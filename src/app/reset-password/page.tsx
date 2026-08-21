@@ -1,10 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 
 export default function ResetPasswordPage() {
-  const router = useRouter();
   const [newPassword, setNewPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -20,27 +18,23 @@ export default function ResetPasswordPage() {
     }
 
     setLoading(true);
-    console.log("[reset-password] submitting");
     try {
       const res = await fetch("/api/auth/reset-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ newPassword }),
       });
-      console.log("[reset-password] fetch status", res.status);
       const data = await res.json();
-      console.log("[reset-password] response body", data);
       if (!res.ok) {
         setError(data.error || "Couldn't update your password.");
         return;
       }
-      console.log("[reset-password] calling router.push('/')");
-      router.push("/");
-      console.log("[reset-password] router.push('/') call returned");
-    } catch (err) {
-      console.log("[reset-password] threw", err);
+      // A full reload (not router.push) so the new session cookie is
+      // guaranteed to be picked up on the next request instead of racing
+      // with the client router's cache of the pre-reset session state.
+      window.location.href = "/";
+    } catch {
       setError("Something went wrong. Try again.");
-    } finally {
       setLoading(false);
     }
   }

@@ -1,10 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 
 export function RecoverPasswordForm({ token }: { token: string }) {
-  const router = useRouter();
   const [newPassword, setNewPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -31,10 +29,12 @@ export function RecoverPasswordForm({ token }: { token: string }) {
         setError(data.error || "Couldn't set your password.");
         return;
       }
-      router.push("/");
+      // A full reload (not router.push) so the new session cookie is
+      // guaranteed to be picked up on the next request instead of racing
+      // with the client router's cache of the pre-recovery session state.
+      window.location.href = "/";
     } catch {
       setError("Something went wrong. Try again.");
-    } finally {
       setLoading(false);
     }
   }

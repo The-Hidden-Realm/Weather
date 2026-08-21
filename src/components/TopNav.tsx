@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import type { SessionPayload } from "@/lib/session";
 import type { FeatureKey } from "@/lib/features";
 import { AlertsBell } from "@/components/AlertsBell";
@@ -38,7 +38,6 @@ function NavLink({ href, label, active }: { href: string; label: string; active:
 }
 
 export function TopNav({ session }: { session: SessionPayload & { enabledFeatures: FeatureKey[] } }) {
-  const router = useRouter();
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [toolsOpen, setToolsOpen] = useState(false);
@@ -85,7 +84,9 @@ export function TopNav({ session }: { session: SessionPayload & { enabledFeature
 
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" });
-    router.push("/login");
+    // Full reload so the cleared session cookie is guaranteed to take
+    // effect immediately instead of racing with the client router's cache.
+    window.location.href = "/login";
   }
 
   const visibleToolsLinks = TOOLS_LINKS.filter((link) => enabledFeatures.includes(link.feature));

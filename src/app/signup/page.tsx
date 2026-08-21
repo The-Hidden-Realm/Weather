@@ -1,11 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 
 export default function SignupPage() {
-  const router = useRouter();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -33,10 +31,12 @@ export default function SignupPage() {
         setError(data.error || "Sign up failed.");
         return;
       }
-      router.push("/");
+      // A full reload (not router.push) so the new session cookie is
+      // guaranteed to be picked up on the next request instead of racing
+      // with the client router's cache of the pre-signup session state.
+      window.location.href = "/";
     } catch {
       setError("Something went wrong. Try again.");
-    } finally {
       setLoading(false);
     }
   }

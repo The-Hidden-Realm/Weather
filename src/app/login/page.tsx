@@ -1,11 +1,10 @@
 "use client";
 
 import { useState, Suspense } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 
 function LoginForm() {
-  const router = useRouter();
   const params = useSearchParams();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -27,10 +26,12 @@ function LoginForm() {
         setError(data.error || "Login failed.");
         return;
       }
-      router.push(params.get("next") || "/");
+      // A full reload (not router.push) so the new session cookie is
+      // guaranteed to be picked up on the next request instead of racing
+      // with the client router's cache of the pre-login session state.
+      window.location.href = params.get("next") || "/";
     } catch {
       setError("Something went wrong. Try again.");
-    } finally {
       setLoading(false);
     }
   }
