@@ -20,6 +20,27 @@ export function setUserFeatures(userId: number, features: FeatureKey[]) {
   getDb().prepare("UPDATE users SET enabled_features = ? WHERE id = ?").run(JSON.stringify(features), userId);
 }
 
+// Syncs every existing user's feature access to exactly match `features` —
+// grants what's toggled on and missing, and revokes what's toggled off but
+// currently present. Backs the admin "push to existing users" action:
+// the auto-approve toggles above only cover new signups by themselves, so
+// this is how that toggle state gets mirrored onto everyone who already has
+// an account, in both directions.
+export function pushFeaturesToAllUsers(features: FeatureKey[]): number {
+  const db = getDb();
+  const users = db.prepare("SELECT * FROM users").all() as UserRow[];
+  const target = new Set(features);
+  let updatedCount = 0;
+  for (const user of users) {
+    const current = getUserFeatures(user);
+    const matches = current.length === features.length && current.every((f) => target.has(f));
+    if (matches) continue;
+    setUserFeatures(user.id, features);
+    updatedCount++;
+  }
+  return updatedCount;
+}
+
 // Re-checks the DB (not just the JWT) so an admin deactivating an account, or
 // changing feature access, takes effect on this user's very next page load,
 // not just their next login.

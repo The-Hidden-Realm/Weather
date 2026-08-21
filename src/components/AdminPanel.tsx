@@ -37,15 +37,7 @@ export function AdminPanel({
             <AdminCameraTable />
           </>
         )}
-        {tab === "auto-features" && (
-          <>
-            <h1 className="mb-1 text-lg font-semibold text-foreground">Auto Features</h1>
-            <p className="mb-5 text-sm text-muted">
-              Features toggled on here are granted automatically to every new signup.
-            </p>
-            <AutoFeaturesPanel />
-          </>
-        )}
+        {tab === "auto-features" && <AutoFeaturesPanel />}
         {tab === "recovery-key" && (
           <>
             <h1 className="mb-1 text-lg font-semibold text-foreground">Recovery Key</h1>

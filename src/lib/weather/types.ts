@@ -87,6 +87,30 @@ export type WeatherPayload = {
   fetchedAt: string;
 };
 
+export type SpcDayOutlook = {
+  day: 1 | 2 | 3;
+  // The SPC issuance time code scraped from their page, e.g. "1630" (UTC/Z) —
+  // null when it couldn't be determined (upstream fetch failure).
+  issued: string | null;
+  // Same instant as `issued`, as a real ISO timestamp so the client can
+  // render it in the viewer's own timezone instead of raw Zulu time.
+  issuedAt: string | null;
+  categoricalImageUrl: string | null;
+  // Day 1 and 2 only; SPC doesn't break Day 3 out by hazard.
+  tornadoImageUrl: string | null;
+  windImageUrl: string | null;
+  hailImageUrl: string | null;
+  // Day 3 only: SPC's combined "any severe hazard" probability map.
+  probabilisticImageUrl: string | null;
+  discussion: string;
+  ok: boolean;
+};
+
+export type SpcOutlooksPayload = {
+  days: SpcDayOutlook[];
+  fetchedAt: string;
+};
+
 export type GeocodeResult = {
   id: number;
   name: string;
