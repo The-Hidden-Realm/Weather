@@ -20,19 +20,25 @@ export default function ResetPasswordPage() {
     }
 
     setLoading(true);
+    console.log("[reset-password] submitting");
     try {
       const res = await fetch("/api/auth/reset-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ newPassword }),
       });
+      console.log("[reset-password] fetch status", res.status);
       const data = await res.json();
+      console.log("[reset-password] response body", data);
       if (!res.ok) {
         setError(data.error || "Couldn't update your password.");
         return;
       }
+      console.log("[reset-password] calling router.push('/')");
       router.push("/");
-    } catch {
+      console.log("[reset-password] router.push('/') call returned");
+    } catch (err) {
+      console.log("[reset-password] threw", err);
       setError("Something went wrong. Try again.");
     } finally {
       setLoading(false);
