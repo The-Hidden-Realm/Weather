@@ -153,7 +153,8 @@ export function AdminUserTable({
         className="w-full max-w-xs rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm text-foreground outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/30"
       />
 
-      <div className="overflow-x-auto rounded-2xl border border-border bg-surface/70">
+      {/* Desktop: full table, unchanged. */}
+      <div className="hidden overflow-x-auto rounded-2xl border border-border bg-surface/70 md:block">
         <table className="w-full text-left text-sm">
           <thead>
             <tr className="border-b border-border text-xs uppercase tracking-wide text-muted">
@@ -190,6 +191,29 @@ export function AdminUserTable({
             )}
           </tbody>
         </table>
+      </div>
+
+      {/* Mobile: stacked cards instead of a cramped table. */}
+      <div className="space-y-2 md:hidden">
+        {filteredUsers.length === 0 ? (
+          <div className="rounded-2xl border border-border bg-surface/70 px-4 py-6 text-center text-sm text-muted">
+            No users match &ldquo;{query}&rdquo;.
+          </div>
+        ) : (
+          filteredUsers.map((u) => (
+            <UserCardItem
+              key={u.id}
+              user={u}
+              isSelf={u.id === currentUserId}
+              onRoleChangeRequest={(nextRole) => setModal({ type: "role", user: u, nextRole })}
+              onToggleActive={() => handleToggleActive(u)}
+              onToggleFeature={(feature) => handleToggleFeature(u, feature)}
+              onDeleteRequest={() => setModal({ type: "delete", user: u })}
+              onResetPasswordRequest={() => setModal({ type: "reset", user: u })}
+              onInfoRequest={() => setModal({ type: "info", user: u })}
+            />
+          ))
+        )}
       </div>
 
       {modal && modal.type === "info" && (() => {
@@ -601,5 +625,49 @@ function UserRowItem({
         />
       </td>
     </tr>
+  );
+}
+
+function UserCardItem({
+  user,
+  isSelf,
+  onRoleChangeRequest,
+  onToggleActive,
+  onToggleFeature,
+  onDeleteRequest,
+  onResetPasswordRequest,
+  onInfoRequest,
+}: {
+  user: AdminUser;
+  isSelf: boolean;
+  onRoleChangeRequest: (role: "admin" | "user") => void;
+  onToggleActive: () => void;
+  onToggleFeature: (feature: FeatureKey) => void;
+  onDeleteRequest: () => void;
+  onResetPasswordRequest: () => void;
+  onInfoRequest: () => void;
+}) {
+  const disabledTitle = isSelf ? "Manage your own account from Settings" : undefined;
+
+  return (
+    <div className="rounded-2xl border border-border bg-surface/70 p-4">
+      <div className="flex items-center justify-between gap-2">
+        <p className="truncate text-sm font-medium text-foreground">{user.username}</p>
+        <ActionsMenu
+          disabled={isSelf}
+          disabledTitle={disabledTitle}
+          onInfoRequest={onInfoRequest}
+          onResetPasswordRequest={onResetPasswordRequest}
+          onDeleteRequest={onDeleteRequest}
+        />
+      </div>
+      <div className="mt-2 divide-y divide-border">
+        <InfoRow label="Role" value={<RoleSelect user={user} disabled={isSelf} disabledTitle={disabledTitle} onRoleChangeRequest={onRoleChangeRequest} />} />
+        <InfoRow label="Status" value={<StatusToggle user={user} disabled={isSelf} disabledTitle={disabledTitle} onToggleActive={onToggleActive} />} />
+        <InfoRow label="Features" value={<FeaturesDropdown user={user} onToggleFeature={onToggleFeature} />} />
+        <InfoRow label="Last login" value={formatDateTime(user.last_login)} />
+        <InfoRow label="Joined" value={formatDate(user.created_at)} />
+      </div>
+    </div>
   );
 }
