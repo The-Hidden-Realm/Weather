@@ -26,9 +26,11 @@ export async function proxy(req: NextRequest) {
   }
 
   if (session.mustChangePassword) {
-    const target = session.mustChangePasswordReason === "admin_reset" ? "/reset-password" : "/change-password";
-    if (pathname !== target) {
-      return NextResponse.redirect(new URL(target, req.url));
+    // Both reasons land on /reset-password: the user just proved identity
+    // by signing in with the password being replaced, so there's no need
+    // to ask for it again.
+    if (pathname !== "/reset-password") {
+      return NextResponse.redirect(new URL("/reset-password", req.url));
     }
   }
 

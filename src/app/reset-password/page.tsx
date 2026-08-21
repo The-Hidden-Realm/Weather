@@ -52,7 +52,7 @@ export default function ResetPasswordPage() {
           </div>
           <h1 className="text-xl font-semibold text-foreground">Set a new password</h1>
           <p className="mt-1 text-sm text-muted">
-            Your password was reset by an administrator. Choose a new password to continue.
+            You&apos;re still using a temporary password. Choose your own to continue.
           </p>
         </div>
 
