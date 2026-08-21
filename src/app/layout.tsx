@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "The Hidden Realm Weather",
-  description: "A dark-themed weather dashboard with a WISH intensity score, powered by Open-Meteo and the National Weather Service.",
+  description: "A dark-themed weather dashboard with a WIS intensity score, powered by Open-Meteo and the National Weather Service.",
 };
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {

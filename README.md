@@ -1,7 +1,7 @@
 # The Hidden Realm Weather
 
-A dark-themed weather dashboard with a custom **WISH score** (Weather Intensity
-Score for Here) — a 0-100 read on how "in your face" the weather is right now,
+A dark-themed weather dashboard with a custom **WIS score** (Weather Intensity
+Score) — a 0-100 read on how "in your face" the weather is right now,
 blending wind, precipitation, temperature extremity, visibility, storm
 activity, and active NWS alerts.
 
@@ -20,7 +20,7 @@ Data comes from [Open-Meteo](https://open-meteo.com/) (current conditions,
   browser's geolocation; picking a new one replaces the old. The location
   title shows city, state, and zip (reverse-geocoded via BigDataCloud's free
   API, since neither Open-Meteo nor NWS return postal codes).
-- Homepage: current conditions + WISH score on the left, a 12-hour forecast
+- Homepage: current conditions + WIS score on the left, a 12-hour forecast
   alongside them on the right, and a 7-day forecast underneath — all with
   weather icons, using the full width on wider screens.
 - Active NWS alerts (e.g. Heat Advisory, Winter Storm Warning) live behind
