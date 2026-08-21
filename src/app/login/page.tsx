@@ -32,6 +32,7 @@ function LoginForm() {
       window.location.href = params.get("next") || "/";
     } catch {
       setError("Something went wrong. Try again.");
+    } finally {
       setLoading(false);
     }
   }

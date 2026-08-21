@@ -7,19 +7,14 @@ import {
   updateTheme,
   updateTimezone,
   updateTimeFormat,
+  updateFirstName,
+  updateEmail,
   setSessionCookie,
 } from "@/lib/auth";
+import { isValidTimeZone } from "@/lib/time";
 
 const USERNAME_RE = /^[a-zA-Z0-9_.-]{3,32}$/;
-
-function isValidTimeZone(tz: string): boolean {
-  try {
-    new Intl.DateTimeFormat(undefined, { timeZone: tz });
-    return true;
-  } catch {
-    return false;
-  }
-}
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export async function PATCH(req: NextRequest) {
   const session = await getSessionUser();
@@ -74,6 +69,26 @@ export async function PATCH(req: NextRequest) {
     timeFormat = body.timeFormat;
   }
 
+  let firstName = user.first_name;
+  if (typeof body.firstName === "string" && body.firstName.trim() !== user.first_name) {
+    const cleanFirstName = body.firstName.trim();
+    if (!cleanFirstName || cleanFirstName.length > 50) {
+      return NextResponse.json({ error: "Name must be 1-50 characters." }, { status: 400 });
+    }
+    updateFirstName(user.id, cleanFirstName);
+    firstName = cleanFirstName;
+  }
+
+  let email = user.email;
+  if (typeof body.email === "string" && body.email.trim() !== user.email) {
+    const cleanEmail = body.email.trim();
+    if (!EMAIL_RE.test(cleanEmail)) {
+      return NextResponse.json({ error: "Enter a valid email address." }, { status: 400 });
+    }
+    updateEmail(user.id, cleanEmail);
+    email = cleanEmail;
+  }
+
   await setSessionCookie({
     userId: user.id,
     username,
@@ -86,7 +101,8 @@ export async function PATCH(req: NextRequest) {
     theme,
     timezone,
     timeFormat,
+    onboardingCompleted: user.onboarding_completed === 1,
   });
 
-  return NextResponse.json({ ok: true, username, theme, timezone, timeFormat });
+  return NextResponse.json({ ok: true, username, theme, timezone, timeFormat, firstName, email });
 }

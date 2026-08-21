@@ -35,6 +35,7 @@ export function RecoverPasswordForm({ token }: { token: string }) {
       window.location.href = "/";
     } catch {
       setError("Something went wrong. Try again.");
+    } finally {
       setLoading(false);
     }
   }

@@ -3,6 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { SessionPayload } from "@/lib/session";
+import { TimezonePicker } from "@/components/TimezonePicker";
+import { ClockFormatPicker } from "@/components/ClockFormatPicker";
+import { ThemePicker } from "@/components/ThemePicker";
 
 function Card({ title, description, children }: { title: string; description: string; children: React.ReactNode }) {
   return (
@@ -26,18 +29,30 @@ function Message({ text, kind }: { text: string; kind: "error" | "success" }) {
   );
 }
 
-export function SettingsForm({ session }: { session: SessionPayload }) {
+export function SettingsForm({
+  session,
+  firstName: initialFirstName,
+  email: initialEmail,
+}: {
+  session: SessionPayload;
+  firstName: string;
+  email: string;
+}) {
   const router = useRouter();
 
-  // Username, theme, timezone, and clock format are staged locally and only
-  // written to the account when the user presses "Save settings" — nothing
-  // here should hit the server on its own.
+  // Username, name, email, theme, timezone, and clock format are staged
+  // locally and only written to the account when the user presses "Save
+  // settings" — nothing here should hit the server on its own.
   const [username, setUsername] = useState(session.username);
+  const [firstName, setFirstName] = useState(initialFirstName);
+  const [email, setEmail] = useState(initialEmail);
   const [theme, setTheme] = useState<"dark" | "light">(session.theme);
   const [timezone, setTimezone] = useState(session.timezone ?? "");
   const [timeFormat, setTimeFormat] = useState<"12h" | "24h">(session.timeFormat);
 
   const [savedUsername, setSavedUsername] = useState(username);
+  const [savedFirstName, setSavedFirstName] = useState(firstName);
+  const [savedEmail, setSavedEmail] = useState(email);
   const [savedTheme, setSavedTheme] = useState(theme);
   const [savedTimezone, setSavedTimezone] = useState(timezone);
   const [savedTimeFormat, setSavedTimeFormat] = useState(timeFormat);
@@ -54,19 +69,34 @@ export function SettingsForm({ session }: { session: SessionPayload }) {
 
   const dirty =
     username.trim() !== savedUsername ||
+    firstName.trim() !== savedFirstName ||
+    email.trim() !== savedEmail ||
     theme !== savedTheme ||
     timezone !== savedTimezone ||
     timeFormat !== savedTimeFormat;
 
+  // Name and email were required to finish onboarding — Settings can change
+  // them to a new value, but not blank them out, since the account is
+  // never supposed to be without one.
+  const missingRequired = username.trim() === "" || firstName.trim() === "" || email.trim() === "";
+  const canSave = dirty && !missingRequired && !saving;
+
   async function handleSave() {
-    if (!dirty || saving) return;
+    if (!canSave) return;
     setSaving(true);
     setSaveMessage(null);
     try {
       const res = await fetch("/api/account", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: username.trim(), theme, timezone: timezone || null, timeFormat }),
+        body: JSON.stringify({
+          username: username.trim(),
+          firstName: firstName.trim(),
+          email: email.trim(),
+          theme,
+          timezone: timezone || null,
+          timeFormat,
+        }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -75,6 +105,10 @@ export function SettingsForm({ session }: { session: SessionPayload }) {
       }
       setUsername(data.username);
       setSavedUsername(data.username);
+      setFirstName(data.firstName);
+      setSavedFirstName(data.firstName);
+      setEmail(data.email);
+      setSavedEmail(data.email);
       setSavedTheme(theme);
       setSavedTimezone(timezone);
       setSavedTimeFormat(timeFormat);
@@ -92,6 +126,8 @@ export function SettingsForm({ session }: { session: SessionPayload }) {
   return (
     <div className="space-y-5 pb-24">
       <UsernameCard value={username} onChange={setUsername} />
+      <NameCard value={firstName} onChange={setFirstName} />
+      <EmailCard value={email} onChange={setEmail} />
       <PasswordCard />
       <ThemeCard value={theme} onChange={setTheme} />
       <TimezoneCard value={timezone} onChange={setTimezone} />
@@ -112,7 +148,8 @@ export function SettingsForm({ session }: { session: SessionPayload }) {
         <button
           type="button"
           onClick={handleSave}
-          disabled={!dirty || saving}
+          disabled={!canSave}
+          title={missingRequired ? "Username, name, and email are required and can't be left blank." : undefined}
           className="rounded-lg bg-accent px-5 py-2.5 text-sm font-medium text-white shadow-lg transition hover:bg-accent-2 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {saving ? "Saving…" : "Save settings"}
@@ -123,13 +160,52 @@ export function SettingsForm({ session }: { session: SessionPayload }) {
 }
 
 function UsernameCard({ value, onChange }: { value: string; onChange: (next: string) => void }) {
+  const empty = value.trim() === "";
   return (
     <Card title="Username" description="This is what shows up as “Logged in as”.">
       <input
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm text-foreground outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
+        className={`w-full rounded-lg border bg-surface-2 px-3 py-2 text-sm text-foreground outline-none focus:ring-2 focus:ring-accent/30 ${
+          empty ? "border-danger/50 focus:border-danger" : "border-border focus:border-accent"
+        }`}
       />
+      {empty && <p className="mt-1.5 text-xs text-danger">Required — this can&apos;t be left blank.</p>}
+    </Card>
+  );
+}
+
+function NameCard({ value, onChange }: { value: string; onChange: (next: string) => void }) {
+  const empty = value.trim() === "";
+  return (
+    <Card title="Name" description="Visible only to you and admins — never shown to other users.">
+      <input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="First name"
+        className={`w-full rounded-lg border bg-surface-2 px-3 py-2 text-sm text-foreground outline-none focus:ring-2 focus:ring-accent/30 ${
+          empty ? "border-danger/50 focus:border-danger" : "border-border focus:border-accent"
+        }`}
+      />
+      {empty && <p className="mt-1.5 text-xs text-danger">Required — this can&apos;t be left blank.</p>}
+    </Card>
+  );
+}
+
+function EmailCard({ value, onChange }: { value: string; onChange: (next: string) => void }) {
+  const empty = value.trim() === "";
+  return (
+    <Card title="Email" description="Used for account recovery. Visible only to you and admins.">
+      <input
+        type="email"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="you@example.com"
+        className={`w-full rounded-lg border bg-surface-2 px-3 py-2 text-sm text-foreground outline-none focus:ring-2 focus:ring-accent/30 ${
+          empty ? "border-danger/50 focus:border-danger" : "border-border focus:border-accent"
+        }`}
+      />
+      {empty && <p className="mt-1.5 text-xs text-danger">Required — this can&apos;t be left blank.</p>}
     </Card>
   );
 }
@@ -226,153 +302,18 @@ function ThemeCard({
 }) {
   return (
     <Card title="Appearance" description="Pick how The Hidden Realm Weather looks for your account.">
-      <div className="flex gap-3">
-        <ThemeOption label="Dark" active={value === "dark"} onClick={() => onChange("dark")}>
-          <div className="h-14 w-full rounded-lg border border-border/60 bg-[#0a0e17] p-2">
-            <div className="h-2 w-8 rounded-full bg-[#3b82f6]" />
-            <div className="mt-2 h-2 w-14 rounded-full bg-[#223049]" />
-          </div>
-        </ThemeOption>
-        <ThemeOption label="Light" active={value === "light"} onClick={() => onChange("light")}>
-          <div className="h-14 w-full rounded-lg border border-border/60 bg-[#f4f7fc] p-2">
-            <div className="h-2 w-8 rounded-full bg-[#2563eb]" />
-            <div className="mt-2 h-2 w-14 rounded-full bg-[#dbe3ef]" />
-          </div>
-        </ThemeOption>
-      </div>
+      <ThemePicker value={value} onChange={onChange} />
     </Card>
   );
 }
 
-const TIMEZONES: string[] =
-  typeof Intl.supportedValuesOf === "function" ? Intl.supportedValuesOf("timeZone") : [];
-
-const AUTOMATIC_LABEL = "Automatic (use location’s timezone)";
-
-// Common US-style names people actually search for ("eastern", "pacific"...)
-// rather than the IANA city names those zones are keyed by underneath.
-const TIMEZONE_ALIASES: { label: string; tz: string; keywords: string[] }[] = [
-  { label: "Eastern Time", tz: "America/New_York", keywords: ["eastern", "et", "est", "edt"] },
-  { label: "Central Time", tz: "America/Chicago", keywords: ["central", "ct", "cst", "cdt"] },
-  { label: "Mountain Time", tz: "America/Denver", keywords: ["mountain", "mt", "mst", "mdt"] },
-  { label: "Arizona Time (no DST)", tz: "America/Phoenix", keywords: ["arizona"] },
-  { label: "Pacific Time", tz: "America/Los_Angeles", keywords: ["pacific", "pt", "pst", "pdt"] },
-  { label: "Alaska Time", tz: "America/Anchorage", keywords: ["alaska", "akst", "akdt"] },
-  { label: "Hawaii Time", tz: "Pacific/Honolulu", keywords: ["hawaii", "hst"] },
-  { label: "Atlantic Time", tz: "America/Puerto_Rico", keywords: ["atlantic", "ast"] },
-];
-const ALIAS_TZ_SET = new Set(TIMEZONE_ALIASES.map((a) => a.tz));
-
-function timezoneLabel(tz: string): string {
-  if (tz === "") return AUTOMATIC_LABEL;
-  const alias = TIMEZONE_ALIASES.find((a) => a.tz === tz);
-  return alias ? `${alias.label} (${tz.replace(/_/g, " ")})` : tz.replace(/_/g, " ");
-}
-
 function TimezoneCard({ value, onChange }: { value: string; onChange: (next: string) => void }) {
-  const [query, setQuery] = useState(timezoneLabel(value));
-  const [open, setOpen] = useState(false);
-  const boxRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    function onClickOutside(e: MouseEvent) {
-      if (boxRef.current && !boxRef.current.contains(e.target as Node)) {
-        setOpen(false);
-        setQuery(timezoneLabel(value));
-      }
-    }
-    document.addEventListener("mousedown", onClickOutside);
-    return () => document.removeEventListener("mousedown", onClickOutside);
-  }, [value]);
-
-  const needle = query.trim().toLowerCase();
-  const aliasMatches = needle
-    ? TIMEZONE_ALIASES.filter(
-        (a) => a.label.toLowerCase().includes(needle) || a.keywords.some((k) => k.includes(needle))
-      )
-    : TIMEZONE_ALIASES;
-  const matches = (
-    needle
-      ? TIMEZONES.filter((tz) => tz.replace(/_/g, " ").toLowerCase().includes(needle))
-      : TIMEZONES
-  )
-    .filter((tz) => !ALIAS_TZ_SET.has(tz))
-    .slice(0, 50);
-  const showAutomatic = !needle || AUTOMATIC_LABEL.toLowerCase().includes(needle);
-
-  function selectTimezone(next: string) {
-    onChange(next);
-    setQuery(timezoneLabel(next));
-    setOpen(false);
-  }
-
   return (
     <Card
       title="Timezone"
       description="Times across the dashboard use your saved location's timezone unless you fix one here."
     >
-      <div ref={boxRef} className="relative">
-        <input
-          value={query}
-          onFocus={(e) => {
-            setOpen(true);
-            e.target.select();
-          }}
-          onChange={(e) => {
-            setQuery(e.target.value);
-            setOpen(true);
-          }}
-          placeholder="Search for a timezone…"
-          className="w-full rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm text-foreground outline-none focus:border-accent focus:ring-2 focus:ring-accent/30"
-        />
-
-        {open && (
-          <div className="absolute left-0 right-0 z-20 mt-1 max-h-64 overflow-y-auto rounded-lg border border-border bg-surface-2 shadow-xl">
-            {showAutomatic && (
-              <button
-                type="button"
-                onClick={() => selectTimezone("")}
-                className={`block w-full px-3 py-2 text-left text-sm hover:bg-accent/10 ${
-                  value === "" ? "text-accent-2" : "text-foreground"
-                }`}
-              >
-                {AUTOMATIC_LABEL}
-              </button>
-            )}
-            {aliasMatches.map((a) => (
-              <button
-                key={a.tz}
-                type="button"
-                onClick={() => selectTimezone(a.tz)}
-                className={`block w-full px-3 py-2 text-left text-sm hover:bg-accent/10 ${
-                  value === a.tz ? "text-accent-2" : "text-foreground"
-                }`}
-              >
-                {a.label}
-                <span className="ml-1.5 text-xs text-muted">{a.tz.replace(/_/g, " ")}</span>
-              </button>
-            ))}
-            {aliasMatches.length > 0 && matches.length > 0 && (
-              <div className="border-t border-border" />
-            )}
-            {matches.map((tz) => (
-              <button
-                key={tz}
-                type="button"
-                onClick={() => selectTimezone(tz)}
-                className={`block w-full px-3 py-2 text-left text-sm hover:bg-accent/10 ${
-                  value === tz ? "text-accent-2" : "text-foreground"
-                }`}
-              >
-                {timezoneLabel(tz)}
-              </button>
-            ))}
-            {!showAutomatic && aliasMatches.length === 0 && matches.length === 0 && (
-              <p className="px-3 py-2 text-sm text-muted">No matching timezone.</p>
-            )}
-          </div>
-        )}
-      </div>
+      <TimezonePicker value={value} onChange={onChange} />
     </Card>
   );
 }
@@ -386,48 +327,8 @@ function ClockFormatCard({
 }) {
   return (
     <Card title="Clock format" description="Choose how times are displayed across the dashboard.">
-      <div className="flex gap-3">
-        <ThemeOption label="12-hour" active={value === "12h"} onClick={() => onChange("12h")}>
-          <div className="flex h-14 w-full items-center justify-center rounded-lg border border-border/60 bg-surface-2 text-sm text-foreground">
-            1:00 PM
-          </div>
-        </ThemeOption>
-        <ThemeOption label="24-hour" active={value === "24h"} onClick={() => onChange("24h")}>
-          <div className="flex h-14 w-full items-center justify-center rounded-lg border border-border/60 bg-surface-2 text-sm text-foreground">
-            13:00
-          </div>
-        </ThemeOption>
-      </div>
+      <ClockFormatPicker value={value} onChange={onChange} />
     </Card>
   );
 }
 
-function ThemeOption({
-  label,
-  active,
-  onClick,
-  children,
-}: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`flex-1 rounded-xl border p-2 text-left transition ${
-        active ? "border-accent ring-2 ring-accent/30" : "border-border hover:border-accent/50"
-      }`}
-    >
-      {children}
-      <div className="mt-2 flex items-center gap-1.5 text-xs text-foreground">
-        <span
-          className={`h-1.5 w-1.5 rounded-full ${active ? "bg-accent" : "bg-transparent border border-border"}`}
-        />
-        {label}
-      </div>
-    </button>
-  );
-}

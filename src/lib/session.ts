@@ -22,6 +22,10 @@ export type SessionPayload = {
   // null = follow the current location's timezone instead of a fixed one.
   timezone: string | null;
   timeFormat: "12h" | "24h";
+  // Gates the post-signup welcome flow (name, email, timezone, home
+  // location). False only for freshly signed-up accounts that haven't
+  // finished it yet.
+  onboardingCompleted: boolean;
 };
 
 export async function createSessionToken(payload: SessionPayload): Promise<string> {
@@ -52,6 +56,11 @@ export async function verifySessionToken(token: string): Promise<SessionPayload 
         theme: payload.theme === "light" ? "light" : "dark",
         timezone: typeof payload.timezone === "string" ? payload.timezone : null,
         timeFormat: payload.timeFormat === "24h" ? "24h" : "12h",
+        // Tokens issued before this field existed carry no value at all —
+        // treat that as already onboarded rather than forcing every
+        // already-active session through the welcome flow. Only an
+        // explicit `false` (freshly signed up, not yet finished) counts.
+        onboardingCompleted: payload.onboardingCompleted !== false,
       };
     }
     return null;

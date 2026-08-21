@@ -90,6 +90,20 @@ export function updateTimeFormat(userId: number, timeFormat: "12h" | "24h") {
   getDb().prepare("UPDATE users SET time_format = ? WHERE id = ?").run(timeFormat, userId);
 }
 
+// first_name/email are only ever shown to the account owner (Settings) and
+// admins (Admin panel) — no other surface reads them.
+export function updateFirstName(userId: number, firstName: string) {
+  getDb().prepare("UPDATE users SET first_name = ? WHERE id = ?").run(firstName, userId);
+}
+
+export function updateEmail(userId: number, email: string) {
+  getDb().prepare("UPDATE users SET email = ? WHERE id = ?").run(email, userId);
+}
+
+export function completeOnboarding(userId: number) {
+  getDb().prepare("UPDATE users SET onboarding_completed = 1 WHERE id = ?").run(userId);
+}
+
 export function recordLogin(userId: number) {
   getDb().prepare("UPDATE users SET last_login = datetime('now') WHERE id = ?").run(userId);
 }
