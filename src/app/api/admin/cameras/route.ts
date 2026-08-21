@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
-import { createCamera } from "@/lib/cameras";
+import { createCamera, listCameras } from "@/lib/cameras";
 import { normalizeCameraSourceUrl } from "@/lib/camera-utils";
 
 function isValidSourceUrl(url: string): boolean {
@@ -10,6 +10,17 @@ function isValidSourceUrl(url: string): boolean {
   } catch {
     return false;
   }
+}
+
+// Unlike GET /api/cameras (gated by the cameras feature flag, for the
+// per-user camera picker), this lists every camera for the admin management
+// table regardless of whether the admin's own account has that feature on.
+export async function GET() {
+  const session = await getSessionUser();
+  if (!session || session.role !== "admin") {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  return NextResponse.json({ cameras: listCameras() });
 }
 
 export async function POST(req: NextRequest) {

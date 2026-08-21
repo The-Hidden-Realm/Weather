@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { findUserByUsername, createUser, setSessionCookie } from "@/lib/auth";
+import { findUserByUsername, createUser, setSessionCookie, setUserFeatures } from "@/lib/auth";
+import { getAutoApproveFeatures } from "@/lib/settings";
 
 const USERNAME_RE = /^[a-zA-Z0-9_.-]{3,32}$/;
 
@@ -30,6 +31,10 @@ export async function POST(req: NextRequest) {
   }
 
   const user = createUser(cleanUsername, password, "user");
+  const autoFeatures = getAutoApproveFeatures();
+  if (autoFeatures.length > 0) {
+    setUserFeatures(user.id, autoFeatures);
+  }
   await setSessionCookie({
     userId: user.id,
     username: user.username,

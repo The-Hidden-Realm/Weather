@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, Suspense } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { AdminRecoveryModal } from "@/components/AdminRecoveryModal";
 
 function LoginForm() {
   const params = useSearchParams();
@@ -10,6 +11,22 @@ function LoginForm() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [recoveryOpen, setRecoveryOpen] = useState(false);
+  const [recoveredNotice, setRecoveredNotice] = useState<string | null>(null);
+
+  // Hidden escape hatch for a forgotten admin password — not discoverable
+  // from the UI, only from knowing the shortcut exists (see the Recovery
+  // Key tab in the Admin panel, where this is documented and configured).
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.ctrlKey && e.shiftKey && e.key === "Enter") {
+        e.preventDefault();
+        setRecoveryOpen(true);
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -74,6 +91,12 @@ function LoginForm() {
             autoComplete="current-password"
           />
 
+          {recoveredNotice && (
+            <div className="mb-4 rounded-lg border border-good/30 bg-good/10 px-3 py-2 text-sm text-good">
+              {recoveredNotice}
+            </div>
+          )}
+
           {error && (
             <div className="mb-4 rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">
               {error}
@@ -96,6 +119,18 @@ function LoginForm() {
           </Link>
         </p>
       </div>
+
+      {recoveryOpen && (
+        <AdminRecoveryModal
+          onClose={() => setRecoveryOpen(false)}
+          onRecovered={(recoveredUsername) => {
+            setRecoveryOpen(false);
+            setUsername(recoveredUsername);
+            setPassword("");
+            setRecoveredNotice("Password updated. Sign in with your new password.");
+          }}
+        />
+      )}
     </div>
   );
 }

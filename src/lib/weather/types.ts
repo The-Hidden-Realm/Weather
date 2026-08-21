@@ -11,8 +11,8 @@ export type CurrentConditions = {
   // Raw station pressure in hPa, uncorrected for elevation — matches what
   // a barometer at this location actually reads.
   pressure: number;
-  // Relative to the standard atmosphere pressure expected at this
-  // location's elevation, not the flat 1013.25 hPa sea-level constant.
+  // Relative to the flat 1013.25 hPa sea-level standard (not adjusted for
+  // this location's elevation).
   pressureTrend: "low" | "high";
   visibility: number | null;
   precipitation: number;

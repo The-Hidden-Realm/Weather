@@ -132,6 +132,15 @@ function ensureCameraAudioUrlColumn(db: Database.Database) {
   db.exec("ALTER TABLE cameras ADD COLUMN audio_url TEXT");
 }
 
+// Only a bcrypt hash of the admin recovery key is ever stored — same
+// treatment as a password, since it's a bearer secret that resets one.
+// NULL means the feature is unconfigured/off.
+function ensureAdminRecoveryKeyColumn(db: Database.Database) {
+  const columns = db.prepare("PRAGMA table_info(instance_settings)").all() as { name: string }[];
+  if (columns.some((c) => c.name === "admin_recovery_key_hash")) return;
+  db.exec("ALTER TABLE instance_settings ADD COLUMN admin_recovery_key_hash TEXT");
+}
+
 // Seeded once, only if no cameras exist yet — so an admin deleting them
 // (once real cameras are added) doesn't cause them to reappear on restart.
 const TEST_CAMERAS: { name: string; category: string; sourceUrl: string; hasAudio: number }[] = [
@@ -240,7 +249,20 @@ function init(): Database.Database {
       used_at TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
+
+    -- Single-row instance-wide settings, not tied to any one user.
+    -- auto_approve_features lists features granted automatically to every
+    -- new signup, instead of an admin having to enable them per-account.
+    -- admin_recovery_key_hash backs the hidden Ctrl+Shift+Enter reset on the
+    -- sign-in page (NULL = not configured).
+    CREATE TABLE IF NOT EXISTS instance_settings (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      auto_approve_features TEXT NOT NULL DEFAULT '[]',
+      admin_recovery_key_hash TEXT
+    );
   `);
+
+  db.exec("INSERT OR IGNORE INTO instance_settings (id, auto_approve_features) VALUES (1, '[]')");
 
   ensureMustChangePasswordColumn(db);
   ensureMustChangePasswordReasonColumn(db);
@@ -251,6 +273,7 @@ function init(): Database.Database {
   ensureAdminControlColumns(db);
   ensureOnboardingColumns(db);
   ensureCameraAudioUrlColumn(db);
+  ensureAdminRecoveryKeyColumn(db);
   ensureTestCameras(db);
 
   const adminUsername = readSecret("ADMIN_USERNAME", "Admin")!;
@@ -326,6 +349,12 @@ export type CameraLayoutRow = {
   user_id: number;
   slot: number;
   camera_id: number | null;
+};
+
+export type InstanceSettingsRow = {
+  id: number;
+  auto_approve_features: string;
+  admin_recovery_key_hash: string | null;
 };
 
 export type RecoveryTokenRow = {
