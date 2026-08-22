@@ -259,6 +259,19 @@ export function isYouTubeEmbedUrl(url: string): boolean {
   }
 }
 
+// hazcams.com's station pages have no chromeless/embed mode and expose no
+// raw stream URL (their player feeds a <video> from a same-origin blob:
+// URL), so a tile showing one has to embed their full page and visually
+// crop out their own header bar and bottom HUD/watermark — see
+// HAZCAMS_CROP_* in CameraTile.tsx for the actual crop.
+export function isHazcamsUrl(url: string): boolean {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "") === "hazcams.com";
+  } catch {
+    return false;
+  }
+}
+
 // Sends a command to an embedded YouTube player over postMessage — requires
 // `enablejsapi=1` on the embed URL. This is the only way to change an
 // already-playing cross-origin YouTube embed's mute state instantly; toggling

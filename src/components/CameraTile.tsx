@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { CameraRow } from "@/lib/db";
-import { isDirectVideoSource, isYouTubeEmbedUrl, postYouTubeCommand } from "@/lib/camera-utils";
+import { isDirectVideoSource, isYouTubeEmbedUrl, isHazcamsUrl, postYouTubeCommand } from "@/lib/camera-utils";
 
 export type CameraDragData =
   | { type: "slot"; slot: number }
@@ -126,6 +126,75 @@ function CameraOverlay({ variant, offlineLabel }: { variant: "loading" | "buffer
   );
 }
 
+// hazcams.com's station pages always render their mobile/narrow layout
+// under their ~768px breakpoint (true for every tile size in this grid), so
+// their header bar (back/settings/share/name/viewer count, ~60px) and bottom
+// HUD (wind-direction readout + watermark, ~44px) are fixed pixel bands
+// against a 600x338 (16:9) render — measured directly against their page.
+// Rendering the iframe at that fixed reference size, cropping out those two
+// bands with a calibrated zoom, then scaling the clean result to cover
+// whatever shape the actual tile is (mirroring the object-fit: cover used
+// for direct video sources) is the only way to hide chrome hazcams.com
+// doesn't offer an embed mode or raw stream URL to bypass — see
+// isHazcamsUrl in lib/camera-utils.ts.
+const HAZCAMS_REF_WIDTH = 600;
+const HAZCAMS_REF_HEIGHT = 338;
+const HAZCAMS_CROP_SCALE = 1.55;
+const HAZCAMS_CROP_TRANSLATE_X = -(HAZCAMS_REF_WIDTH * (HAZCAMS_CROP_SCALE - 1)) / 2;
+const HAZCAMS_CROP_TRANSLATE_Y = -60 * HAZCAMS_CROP_SCALE;
+
+function HazcamsFrame({ src, onLoad }: { src: string; onLoad: () => void }) {
+  const outerRef = useRef<HTMLDivElement>(null);
+  const [fitScale, setFitScale] = useState(1);
+
+  useEffect(() => {
+    const el = outerRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver((entries) => {
+      const { width, height } = entries[0].contentRect;
+      if (width > 0 && height > 0) {
+        setFitScale(Math.max(width / HAZCAMS_REF_WIDTH, height / HAZCAMS_REF_HEIGHT));
+      }
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div ref={outerRef} className="pointer-events-none absolute inset-0 h-full w-full overflow-hidden">
+      <div
+        style={{
+          position: "absolute",
+          top: "50%",
+          left: "50%",
+          width: HAZCAMS_REF_WIDTH,
+          height: HAZCAMS_REF_HEIGHT,
+          overflow: "hidden",
+          transformOrigin: "center",
+          transform: `translate(-50%, -50%) scale(${fitScale})`,
+        }}
+      >
+        <iframe
+          src={src}
+          scrolling="no"
+          onLoad={onLoad}
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            width: HAZCAMS_REF_WIDTH,
+            height: HAZCAMS_REF_HEIGHT,
+            border: 0,
+            transformOrigin: "top left",
+            transform: `translate(${HAZCAMS_CROP_TRANSLATE_X}px, ${HAZCAMS_CROP_TRANSLATE_Y}px) scale(${HAZCAMS_CROP_SCALE})`,
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
 export function CameraTile({
   camera,
   area,
@@ -164,6 +233,7 @@ export function CameraTile({
   const isDirectVideo = camera ? isDirectVideoSource(camera.source_url) : false;
   const hasAudioLink = !!camera?.audio_url;
   const isYouTubeEmbed = camera ? isYouTubeEmbedUrl(camera.source_url) : false;
+  const isHazcams = camera ? isHazcamsUrl(camera.source_url) : false;
   const canMute = !!camera && !isOffline && (isDirectVideo || hasAudioLink || isYouTubeEmbed);
   // An offline camera's stream never loads for anyone — not even to buffer
   // an initial frame — so no video/audio/iframe element is ever mounted.
@@ -290,6 +360,15 @@ export function CameraTile({
                   showLoadingOverlay ? "opacity-0" : "opacity-100"
                 }`}
               />
+            ) : isHazcams ? (
+              <div
+                key={`${camera.source_url}-${reloadKey}`}
+                className={`h-full w-full transition-opacity duration-300 ${
+                  showLoadingOverlay ? "opacity-0" : "opacity-100"
+                }`}
+              >
+                <HazcamsFrame src={camera.source_url} onLoad={() => setStreamLoaded(true)} />
+              </div>
             ) : (
               <iframe
                 key={`${camera.source_url}-${reloadKey}`}
