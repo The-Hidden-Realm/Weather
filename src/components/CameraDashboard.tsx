@@ -6,6 +6,7 @@ import { CameraGrid } from "@/components/CameraGrid";
 import { CameraSidePanel } from "@/components/CameraSidePanel";
 import { CameraFormModal } from "@/components/CameraFormModal";
 import type { CameraDragData } from "@/components/CameraTile";
+import { CAMERA_CATALOG_CHANGED_EVENT } from "@/lib/camera-utils";
 import { CAMERA_LAYOUTS, MAX_CAMERA_SLOTS, type CameraLayoutMode } from "@/lib/camera-utils";
 
 export function CameraDashboard({ isAdmin }: { isAdmin: boolean }) {
@@ -85,6 +86,26 @@ export function CameraDashboard({ isAdmin }: { isAdmin: boolean }) {
     }
   }
 
+  // The camera controls dialog (Ctrl+Shift+C) lives in TopNav so it's
+  // reachable from every page, not just this one — it manages its own
+  // camera list and broadcasts this event on every change, so a grid
+  // that's currently mounted (this page) can pick it up without a reload.
+  useEffect(() => {
+    async function refreshCatalog() {
+      try {
+        const res = await fetch("/api/cameras");
+        if (!res.ok) return;
+        const data = await res.json();
+        setCameras(data.cameras);
+        setCategories(data.categories);
+      } catch {
+        // Ignore — the next change event (or a page reload) will retry.
+      }
+    }
+    window.addEventListener(CAMERA_CATALOG_CHANGED_EVENT, refreshCatalog);
+    return () => window.removeEventListener(CAMERA_CATALOG_CHANGED_EVENT, refreshCatalog);
+  }, []);
+
   useEffect(() => {
     if (!dragSource) return;
 
@@ -121,10 +142,16 @@ export function CameraDashboard({ isAdmin }: { isAdmin: boolean }) {
     }
 
     document.body.style.cursor = "grabbing";
+    // A fast drag can outrun the two draggable elements' own select-none and
+    // briefly cross other text on the page — selecting it mid-drag fights
+    // the gesture the same way. Suppressing selection page-wide for the
+    // duration of the drag closes that gap.
+    document.body.style.userSelect = "none";
     window.addEventListener("pointermove", onPointerMove);
     window.addEventListener("pointerup", onPointerUp);
     return () => {
       document.body.style.cursor = "";
+      document.body.style.userSelect = "";
       window.removeEventListener("pointermove", onPointerMove);
       window.removeEventListener("pointerup", onPointerUp);
     };
@@ -203,12 +230,20 @@ export function CameraDashboard({ isAdmin }: { isAdmin: boolean }) {
   }
 
   async function assignSlot(slot: number, cameraId: number | null) {
+    // A camera can only occupy one grid slot at a time — besides being
+    // confusing, having the same source streaming into multiple tiles at
+    // once is what made buffering unreliable (duplicate connections fighting
+    // over the same feed). Assigning it to a new slot moves it, clearing
+    // wherever else it was.
+    const duplicateSlots =
+      cameraId == null ? [] : layout.flatMap((id, i) => (i !== slot && id === cameraId ? [i] : []));
     setLayout((prev) => {
       const next = [...prev];
+      for (const i of duplicateSlots) next[i] = null;
       next[slot] = cameraId;
       return next;
     });
-    await putSlot(slot, cameraId);
+    await Promise.all([putSlot(slot, cameraId), ...duplicateSlots.map((i) => putSlot(i, null))]);
   }
 
   async function assignCamera(camera: CameraRow) {

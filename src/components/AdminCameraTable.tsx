@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { CameraRow } from "@/lib/db";
 import { CameraFormModal } from "@/components/CameraFormModal";
-import { isDirectVideoSource } from "@/lib/camera-utils";
+import { camerasToCsv, isDirectVideoSource, parseCamerasCsv } from "@/lib/camera-utils";
 
 export function AdminCameraTable() {
   const [cameras, setCameras] = useState<CameraRow[]>([]);
@@ -15,6 +15,10 @@ export function AdminCameraTable() {
   const [formCamera, setFormCamera] = useState<CameraRow | null | "new">(null);
   const [deleteTarget, setDeleteTarget] = useState<CameraRow | null>(null);
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState<string | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
+  const importInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     async function load() {
@@ -106,6 +110,86 @@ export function AdminCameraTable() {
     setBulkDeleting(false);
   }
 
+  function handleExport() {
+    const csv = camerasToCsv(cameras);
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `cameras-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  // Rows are created one at a time (not in parallel) — modest CSV sizes make
+  // that fine, and it keeps a partial failure easy to attribute to the row
+  // that caused it instead of a pile of simultaneous errors.
+  async function handleImportFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+
+    setImportResult(null);
+    setImportError(null);
+    setImporting(true);
+    try {
+      const text = await file.text();
+      const { cameras: parsed, errors: parseErrors } = parseCamerasCsv(text);
+      if (parsed.length === 0) {
+        setImportError(parseErrors[0] ?? "No cameras found in that file.");
+        return;
+      }
+
+      const created: CameraRow[] = [];
+      const rowErrors = [...parseErrors];
+      for (const row of parsed) {
+        try {
+          const res = await fetch("/api/admin/cameras", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              name: row.name,
+              category: row.category,
+              sourceUrl: row.sourceUrl,
+              audioUrl: row.audioUrl,
+            }),
+          });
+          const data = await res.json();
+          if (!res.ok) {
+            rowErrors.push(`${row.name}: ${data.error || "failed to create."}`);
+            continue;
+          }
+          let camera = data.camera as CameraRow;
+          if (row.isOffline) {
+            const offlineRes = await fetch(`/api/admin/cameras/${camera.id}`, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ isOffline: true }),
+            });
+            if (offlineRes.ok) camera = ((await offlineRes.json()) as { camera: CameraRow }).camera;
+          }
+          created.push(camera);
+        } catch {
+          rowErrors.push(`${row.name}: network error.`);
+        }
+      }
+
+      if (created.length > 0) {
+        setCameras((prev) =>
+          [...prev, ...created].sort((a, b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name))
+        );
+      }
+      setImportResult(`Imported ${created.length} of ${parsed.length} camera${parsed.length === 1 ? "" : "s"}.`);
+      if (rowErrors.length > 0) setImportError(rowErrors.join(" "));
+    } catch {
+      setImportError("Couldn't read that file.");
+    } finally {
+      setImporting(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="rounded-2xl border border-border bg-surface/50 p-10 text-center text-sm text-muted">
@@ -157,6 +241,29 @@ export function AdminCameraTable() {
           )}
           <button
             type="button"
+            disabled={cameras.length === 0}
+            onClick={handleExport}
+            className="rounded-lg border border-border px-3 py-2 text-sm text-muted transition hover:border-accent hover:text-foreground disabled:opacity-60"
+          >
+            Export CSV
+          </button>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            className="hidden"
+            onChange={handleImportFile}
+          />
+          <button
+            type="button"
+            disabled={importing}
+            onClick={() => importInputRef.current?.click()}
+            className="rounded-lg border border-border px-3 py-2 text-sm text-muted transition hover:border-accent hover:text-foreground disabled:opacity-60"
+          >
+            {importing ? "Importing…" : "Import CSV"}
+          </button>
+          <button
+            type="button"
             onClick={() => setFormCamera("new")}
             className="rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white transition hover:bg-accent-2"
           >
@@ -164,6 +271,21 @@ export function AdminCameraTable() {
           </button>
         </div>
       </div>
+
+      {(importResult || importError) && (
+        <div className="space-y-1">
+          {importResult && (
+            <div className="rounded-lg border border-accent/30 bg-accent/10 px-3 py-2 text-sm text-accent-2">
+              {importResult}
+            </div>
+          )}
+          {importError && (
+            <div className="rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">
+              {importError}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Desktop: full table. */}
       <div className="hidden overflow-x-auto rounded-2xl border border-border bg-surface/70 md:block">
@@ -378,7 +500,14 @@ function CameraRowItem({
         />
       </td>
       <td className="px-4 py-3 text-foreground">
-        <CameraNamePreview camera={camera} />
+        <div className="flex items-center gap-1.5">
+          <CameraNamePreview camera={camera} />
+          {camera.is_offline === 1 && (
+            <span className="shrink-0 rounded bg-danger/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-danger">
+              Offline
+            </span>
+          )}
+        </div>
       </td>
       <td className="px-4 py-3 text-muted">{camera.category}</td>
       <td className="max-w-xs truncate px-4 py-3">
@@ -439,7 +568,14 @@ function CameraCardItem({
             className="mt-1 accent-accent"
           />
           <div className="min-w-0">
-            <p className="truncate text-sm font-medium text-foreground">{camera.name}</p>
+            <p className="flex items-center gap-1.5 truncate text-sm font-medium text-foreground">
+              {camera.name}
+              {camera.is_offline === 1 && (
+                <span className="shrink-0 rounded bg-danger/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-danger">
+                  Offline
+                </span>
+              )}
+            </p>
             <p className="text-xs text-muted">{camera.category}</p>
           </div>
         </div>

@@ -132,6 +132,15 @@ function ensureCameraAudioUrlColumn(db: Database.Database) {
   db.exec("ALTER TABLE cameras ADD COLUMN audio_url TEXT");
 }
 
+// Admin-controlled kill switch (Ctrl+Shift+C dialog) — an offline camera
+// never has its stream loaded for anyone, so it can't leak audio/video while
+// the admin is working on it.
+function ensureCameraOfflineColumn(db: Database.Database) {
+  const columns = db.prepare("PRAGMA table_info(cameras)").all() as { name: string }[];
+  if (columns.some((c) => c.name === "is_offline")) return;
+  db.exec("ALTER TABLE cameras ADD COLUMN is_offline INTEGER NOT NULL DEFAULT 0");
+}
+
 // How many tiles the CCTV grid shows for this user (1/4/6/9) — independent
 // of which camera is assigned to which slot in camera_layout below.
 function ensureCameraLayoutModeColumn(db: Database.Database) {
@@ -246,6 +255,15 @@ function init(): Database.Database {
       PRIMARY KEY (user_id, slot)
     );
 
+    -- A private category is hidden from every non-admin: its cameras don't
+    -- appear in their picker/grid, even if already assigned to a slot. Keyed
+    -- by category name (not a camera id) since privacy is a property of the
+    -- grouping, not any one camera in it.
+    CREATE TABLE IF NOT EXISTS camera_categories (
+      category TEXT PRIMARY KEY,
+      is_private INTEGER NOT NULL DEFAULT 0
+    );
+
     -- One-time links for accounts recreated by a backup restore (their real
     -- password was never backed up). Only a hash of the token is stored, so
     -- a DB leak alone can't be used to redeem a still-valid link.
@@ -281,6 +299,7 @@ function init(): Database.Database {
   ensureAdminControlColumns(db);
   ensureOnboardingColumns(db);
   ensureCameraAudioUrlColumn(db);
+  ensureCameraOfflineColumn(db);
   ensureCameraLayoutModeColumn(db);
   ensureAdminRecoveryKeyColumn(db);
   ensureTestCameras(db);
@@ -352,7 +371,13 @@ export type CameraRow = {
   source_url: string;
   has_audio: number;
   audio_url: string | null;
+  is_offline: number;
   created_at: string;
+};
+
+export type CameraCategoryRow = {
+  category: string;
+  is_private: number;
 };
 
 export type CameraLayoutRow = {
