@@ -36,7 +36,7 @@ export async function PATCH(req: NextRequest, ctx: RouteContext<"/api/admin/user
     );
   }
 
-  if (body.role === "admin" || body.role === "user") {
+  if (body.role === "admin" || body.role === "moderator" || body.role === "user") {
     if (!verifyAdminPassword(session, body.adminPassword)) {
       return NextResponse.json({ error: "Incorrect password." }, { status: 403 });
     }

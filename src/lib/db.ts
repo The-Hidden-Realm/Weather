@@ -264,6 +264,19 @@ function init(): Database.Database {
       is_private INTEGER NOT NULL DEFAULT 0
     );
 
+    -- A moderator can add cameras directly but must request removal instead
+    -- of deleting outright — this queues that request for an admin to
+    -- approve (which then actually deletes the camera) or deny.
+    CREATE TABLE IF NOT EXISTS camera_removal_requests (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      camera_id INTEGER NOT NULL REFERENCES cameras(id) ON DELETE CASCADE,
+      requested_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      status TEXT NOT NULL DEFAULT 'pending',
+      requested_at TEXT NOT NULL DEFAULT (datetime('now')),
+      resolved_at TEXT,
+      resolved_by INTEGER REFERENCES users(id) ON DELETE SET NULL
+    );
+
     -- One-time links for accounts recreated by a backup restore (their real
     -- password was never backed up). Only a hash of the token is stored, so
     -- a DB leak alone can't be used to redeem a still-valid link.
@@ -336,7 +349,7 @@ export type UserRow = {
   id: number;
   username: string;
   password_hash: string;
-  role: "admin" | "user";
+  role: "admin" | "moderator" | "user";
   must_change_password: number;
   must_change_password_reason: string | null;
   enabled_features: string;
@@ -378,6 +391,16 @@ export type CameraRow = {
 export type CameraCategoryRow = {
   category: string;
   is_private: number;
+};
+
+export type CameraRemovalRequestRow = {
+  id: number;
+  camera_id: number;
+  requested_by: number;
+  status: "pending" | "approved" | "denied";
+  requested_at: string;
+  resolved_at: string | null;
+  resolved_by: number | null;
 };
 
 export type CameraLayoutRow = {

@@ -17,7 +17,7 @@ const USERNAME_RE = /^[a-zA-Z0-9_.-]{3,32}$/;
 
 export type BackupUser = {
   username: string;
-  role: "admin" | "user";
+  role: "admin" | "moderator" | "user";
   isActive: boolean;
   enabledFeatures: FeatureKey[];
 };
@@ -71,7 +71,7 @@ function isValidBackupUser(u: unknown): u is BackupUser {
   return (
     typeof r.username === "string" &&
     USERNAME_RE.test(r.username) &&
-    (r.role === "admin" || r.role === "user") &&
+    (r.role === "admin" || r.role === "moderator" || r.role === "user") &&
     typeof r.isActive === "boolean" &&
     Array.isArray(r.enabledFeatures) &&
     r.enabledFeatures.every((f) => typeof f === "string")

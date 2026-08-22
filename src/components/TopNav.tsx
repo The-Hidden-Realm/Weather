@@ -47,6 +47,7 @@ export function TopNav({ session }: { session: SessionPayload & { enabledFeature
   const menuRef = useRef<HTMLDivElement>(null);
   const toolsRef = useRef<HTMLDivElement>(null);
   const isAdmin = session.role === "admin";
+  const isModerator = session.role === "moderator";
 
   useEffect(() => {
     function onClickOutside(e: MouseEvent) {
@@ -112,14 +113,14 @@ export function TopNav({ session }: { session: SessionPayload & { enabledFeature
   return (
     <header className="border-b border-border">
       <div className="mx-auto flex max-w-7xl items-center gap-6 px-4 py-4 sm:px-6">
-        <Link href="/" className="flex shrink-0 items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent/15 text-accent">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
               <path d="M17.5 19a4.5 4.5 0 0 0 0-9 6 6 0 0 0-11.6-1.7A4 4 0 0 0 6 16h11.5Z" />
             </svg>
           </div>
-          <span className="font-semibold text-foreground">The Hidden Realm Weather</span>
-        </Link>
+          <span className="font-semibold text-foreground">Hidden Realm Weather</span>
+        </div>
 
         <nav className="flex items-center gap-1">
           {NAV_LINKS.filter((link) => !link.feature || enabledFeatures.includes(link.feature)).map((link) => (
@@ -197,6 +198,19 @@ export function TopNav({ session }: { session: SessionPayload & { enabledFeature
 
             {open && (
               <div className="absolute right-0 z-30 mt-2 w-48 overflow-hidden rounded-xl border border-border bg-surface-2 shadow-xl">
+                {(isAdmin || isModerator) && (
+                  <Link
+                    href="/admin"
+                    onClick={() => setOpen(false)}
+                    className="flex items-center gap-2 px-3 py-2.5 text-sm text-foreground hover:bg-accent/10"
+                  >
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                      <path d="M12 2 4 5v6c0 5 3.4 8.5 8 11 4.6-2.5 8-6 8-11V5l-8-3Z" />
+                    </svg>
+                    {isAdmin ? "Admin panel" : "Moderator panel"}
+                  </Link>
+                )}
+
                 <Link
                   href="/settings"
                   onClick={() => setOpen(false)}
@@ -208,19 +222,6 @@ export function TopNav({ session }: { session: SessionPayload & { enabledFeature
                   </svg>
                   Settings
                 </Link>
-
-                {isAdmin && (
-                  <Link
-                    href="/admin"
-                    onClick={() => setOpen(false)}
-                    className="flex items-center gap-2 px-3 py-2.5 text-sm text-foreground hover:bg-accent/10"
-                  >
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-                      <path d="M12 2 4 5v6c0 5 3.4 8.5 8 11 4.6-2.5 8-6 8-11V5l-8-3Z" />
-                    </svg>
-                    Admin panel
-                  </Link>
-                )}
 
                 <div className="border-t border-border" />
 

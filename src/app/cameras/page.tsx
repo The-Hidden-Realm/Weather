@@ -1,4 +1,4 @@
-import { redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { getActiveSessionUser } from "@/lib/auth";
 import { TopNav } from "@/components/TopNav";
 import { CameraDashboard } from "@/components/CameraDashboard";
@@ -6,7 +6,7 @@ import { CameraDashboard } from "@/components/CameraDashboard";
 export default async function CamerasPage() {
   const session = await getActiveSessionUser();
   if (!session) return null; // proxy guarantees this won't render unauthenticated
-  if (!session.enabledFeatures.includes("cameras")) redirect("/");
+  if (!session.enabledFeatures.includes("cameras")) notFound();
 
   return (
     <div className="min-h-dvh">

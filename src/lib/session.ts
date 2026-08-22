@@ -12,7 +12,7 @@ function getSecretKey(): Uint8Array {
 export type SessionPayload = {
   userId: number;
   username: string;
-  role: "admin" | "user";
+  role: "admin" | "moderator" | "user";
   mustChangePassword: boolean;
   // Which forced-password-change page to send the user to: the shipped
   // default password asks for current + new; an admin-issued temp password
@@ -42,7 +42,7 @@ export async function verifySessionToken(token: string): Promise<SessionPayload 
     if (
       typeof payload.userId === "number" &&
       typeof payload.username === "string" &&
-      (payload.role === "admin" || payload.role === "user")
+      (payload.role === "admin" || payload.role === "moderator" || payload.role === "user")
     ) {
       return {
         userId: payload.userId,

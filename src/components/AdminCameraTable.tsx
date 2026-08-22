@@ -1,11 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { CameraRow } from "@/lib/db";
+import type { CameraRow, CameraRemovalRequestRow } from "@/lib/db";
 import { CameraFormModal } from "@/components/CameraFormModal";
 import { camerasToCsv, isDirectVideoSource, parseCamerasCsv } from "@/lib/camera-utils";
 
-export function AdminCameraTable() {
+type RemovalRequest = CameraRemovalRequestRow & { camera_name: string; requested_by_username: string };
+
+export function AdminCameraTable({ role }: { role: "admin" | "moderator" }) {
+  const isModerator = role === "moderator";
   const [cameras, setCameras] = useState<CameraRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -18,6 +21,9 @@ export function AdminCameraTable() {
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<string | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
+  const [requestNotice, setRequestNotice] = useState<string | null>(null);
+  const [removalRequests, setRemovalRequests] = useState<RemovalRequest[]>([]);
+  const [resolvingRequestId, setResolvingRequestId] = useState<number | null>(null);
   const importInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -36,6 +42,37 @@ export function AdminCameraTable() {
     }
     load();
   }, []);
+
+  useEffect(() => {
+    if (isModerator) return;
+    async function loadRequests() {
+      const res = await fetch("/api/admin/cameras/removal-requests");
+      if (res.ok) {
+        const data = await res.json();
+        setRemovalRequests(data.requests);
+      }
+    }
+    loadRequests();
+  }, [isModerator]);
+
+  async function handleResolveRequest(request: RemovalRequest, action: "approve" | "deny") {
+    setResolvingRequestId(request.id);
+    try {
+      const res = await fetch(`/api/admin/cameras/removal-requests/${request.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+      if (res.ok) {
+        setRemovalRequests((prev) => prev.filter((r) => r.id !== request.id));
+        if (action === "approve") {
+          setCameras((prev) => prev.filter((c) => c.id !== request.camera_id));
+        }
+      }
+    } finally {
+      setResolvingRequestId(null);
+    }
+  }
 
   const categories = [...new Set(cameras.map((c) => c.category))].sort((a, b) => a.localeCompare(b));
 
@@ -79,6 +116,19 @@ export function AdminCameraTable() {
   }
 
   async function handleDelete(camera: CameraRow) {
+    if (isModerator) {
+      const res = await fetch("/api/admin/cameras/removal-requests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cameraId: camera.id }),
+      });
+      if (res.ok) {
+        setRequestNotice(`Removal requested for "${camera.name}" — an admin will review it.`);
+      }
+      setDeleteTarget(null);
+      return;
+    }
+
     const res = await fetch(`/api/admin/cameras/${camera.id}`, { method: "DELETE" });
     if (res.ok) {
       setCameras((prev) => prev.filter((c) => c.id !== camera.id));
@@ -94,6 +144,23 @@ export function AdminCameraTable() {
   async function handleBulkDelete() {
     setBulkDeleting(true);
     const ids = [...selected];
+
+    if (isModerator) {
+      await Promise.all(
+        ids.map((id) =>
+          fetch("/api/admin/cameras/removal-requests", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ cameraId: id }),
+          })
+        )
+      );
+      setRequestNotice(`Removal requested for ${ids.length} camera${ids.length === 1 ? "" : "s"} — an admin will review them.`);
+      setSelected(new Set());
+      setBulkDeleting(false);
+      return;
+    }
+
     const results = await Promise.all(
       ids.map(async (id) => {
         const res = await fetch(`/api/admin/cameras/${id}`, { method: "DELETE" });
@@ -236,7 +303,13 @@ export function AdminCameraTable() {
               onClick={handleBulkDelete}
               className="rounded-lg border border-danger/30 px-3 py-2 text-sm font-medium text-danger transition hover:bg-danger/10 disabled:opacity-60"
             >
-              {bulkDeleting ? "Deleting…" : `Delete ${selected.size} selected`}
+              {bulkDeleting
+                ? isModerator
+                  ? "Requesting…"
+                  : "Deleting…"
+                : isModerator
+                  ? `Request removal for ${selected.size} selected`
+                  : `Delete ${selected.size} selected`}
             </button>
           )}
           <button
@@ -272,7 +345,7 @@ export function AdminCameraTable() {
         </div>
       </div>
 
-      {(importResult || importError) && (
+      {(importResult || importError || requestNotice) && (
         <div className="space-y-1">
           {importResult && (
             <div className="rounded-lg border border-accent/30 bg-accent/10 px-3 py-2 text-sm text-accent-2">
@@ -284,6 +357,50 @@ export function AdminCameraTable() {
               {importError}
             </div>
           )}
+          {requestNotice && (
+            <div className="rounded-lg border border-accent/30 bg-accent/10 px-3 py-2 text-sm text-accent-2">
+              {requestNotice}
+            </div>
+          )}
+        </div>
+      )}
+
+      {!isModerator && removalRequests.length > 0 && (
+        <div className="rounded-2xl border border-warn/30 bg-warn/5 p-4">
+          <h3 className="mb-3 text-sm font-medium text-foreground">
+            Removal requests <span className="text-muted">({removalRequests.length} pending)</span>
+          </h3>
+          <div className="space-y-2">
+            {removalRequests.map((r) => (
+              <div
+                key={r.id}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-surface/70 px-3 py-2"
+              >
+                <p className="text-sm text-foreground">
+                  <span className="font-medium">{r.camera_name}</span>{" "}
+                  <span className="text-muted">— requested by {r.requested_by_username}</span>
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    disabled={resolvingRequestId === r.id}
+                    onClick={() => handleResolveRequest(r, "deny")}
+                    className="rounded-lg border border-border px-2.5 py-1 text-xs text-muted transition hover:border-accent hover:text-foreground disabled:opacity-60"
+                  >
+                    Deny
+                  </button>
+                  <button
+                    type="button"
+                    disabled={resolvingRequestId === r.id}
+                    onClick={() => handleResolveRequest(r, "approve")}
+                    className="rounded-lg border border-danger/30 px-2.5 py-1 text-xs text-danger transition hover:bg-danger/10 disabled:opacity-60"
+                  >
+                    Approve
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
@@ -320,6 +437,7 @@ export function AdminCameraTable() {
                   key={c.id}
                   camera={c}
                   checked={selected.has(c.id)}
+                  isModerator={isModerator}
                   onToggleSelect={() => toggleSelect(c.id)}
                   onEdit={() => setFormCamera(c)}
                   onDelete={() => setDeleteTarget(c)}
@@ -342,6 +460,7 @@ export function AdminCameraTable() {
               key={c.id}
               camera={c}
               checked={selected.has(c.id)}
+              isModerator={isModerator}
               onToggleSelect={() => toggleSelect(c.id)}
               onEdit={() => setFormCamera(c)}
               onDelete={() => setDeleteTarget(c)}
@@ -367,9 +486,13 @@ export function AdminCameraTable() {
             className="w-full max-w-sm rounded-2xl border border-border bg-surface p-5 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <p className="text-sm font-medium text-foreground">Delete &ldquo;{deleteTarget.name}&rdquo;?</p>
+            <p className="text-sm font-medium text-foreground">
+              {isModerator ? "Request removal of" : "Delete"} &ldquo;{deleteTarget.name}&rdquo;?
+            </p>
             <p className="mt-1 text-xs text-muted">
-              This removes it from every user&rsquo;s view. This can&rsquo;t be undone.
+              {isModerator
+                ? "An admin will review this request before the camera is actually removed."
+                : "This removes it from every user's view. This can't be undone."}
             </p>
             <div className="mt-4 flex justify-end gap-2">
               <button
@@ -384,7 +507,7 @@ export function AdminCameraTable() {
                 onClick={() => handleDelete(deleteTarget)}
                 className="rounded-lg bg-danger px-3 py-1.5 text-sm font-medium text-white hover:bg-danger/90"
               >
-                Delete
+                {isModerator ? "Request removal" : "Delete"}
               </button>
             </div>
           </div>
@@ -478,12 +601,14 @@ function CameraNamePreview({ camera }: { camera: CameraRow }) {
 function CameraRowItem({
   camera,
   checked,
+  isModerator,
   onToggleSelect,
   onEdit,
   onDelete,
 }: {
   camera: CameraRow;
   checked: boolean;
+  isModerator: boolean;
   onToggleSelect: () => void;
   onEdit: () => void;
   onDelete: () => void;
@@ -523,19 +648,21 @@ function CameraRowItem({
       <td className="px-4 py-3 text-muted">{camera.has_audio ? "Yes" : "N/A"}</td>
       <td className="px-4 py-3">
         <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={onEdit}
-            className="rounded-lg border border-border px-2.5 py-1 text-xs text-muted transition hover:border-accent hover:text-foreground"
-          >
-            Edit
-          </button>
+          {!isModerator && (
+            <button
+              type="button"
+              onClick={onEdit}
+              className="rounded-lg border border-border px-2.5 py-1 text-xs text-muted transition hover:border-accent hover:text-foreground"
+            >
+              Edit
+            </button>
+          )}
           <button
             type="button"
             onClick={onDelete}
             className="rounded-lg border border-danger/30 px-2.5 py-1 text-xs text-danger transition hover:bg-danger/10"
           >
-            Delete
+            {isModerator ? "Request removal" : "Delete"}
           </button>
         </div>
       </td>
@@ -546,12 +673,14 @@ function CameraRowItem({
 function CameraCardItem({
   camera,
   checked,
+  isModerator,
   onToggleSelect,
   onEdit,
   onDelete,
 }: {
   camera: CameraRow;
   checked: boolean;
+  isModerator: boolean;
   onToggleSelect: () => void;
   onEdit: () => void;
   onDelete: () => void;
@@ -580,19 +709,21 @@ function CameraCardItem({
           </div>
         </div>
         <div className="flex shrink-0 gap-2">
-          <button
-            type="button"
-            onClick={onEdit}
-            className="rounded-lg border border-border px-2.5 py-1 text-xs text-muted transition hover:border-accent hover:text-foreground"
-          >
-            Edit
-          </button>
+          {!isModerator && (
+            <button
+              type="button"
+              onClick={onEdit}
+              className="rounded-lg border border-border px-2.5 py-1 text-xs text-muted transition hover:border-accent hover:text-foreground"
+            >
+              Edit
+            </button>
+          )}
           <button
             type="button"
             onClick={onDelete}
             className="rounded-lg border border-danger/30 px-2.5 py-1 text-xs text-danger transition hover:bg-danger/10"
           >
-            Delete
+            {isModerator ? "Request removal" : "Delete"}
           </button>
         </div>
       </div>

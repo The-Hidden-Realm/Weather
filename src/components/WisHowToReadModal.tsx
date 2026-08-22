@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { WISH_BANDS, WISH_FACTOR_INFO, LIFE_THREATENING_BAND } from "@/lib/weather/wishScore";
+import { WIS_BANDS, WIS_FACTOR_INFO, LIFE_THREATENING_BAND } from "@/lib/weather/wisScore";
 
 const COLOR_VAR: Record<string, string> = {
   good: "var(--good)",
@@ -54,7 +54,7 @@ export function WisHowToReadModal({
         </div>
 
         <div className="space-y-2 border-b border-border p-5">
-          {WISH_BANDS.map((band) => {
+          {WIS_BANDS.map((band) => {
             const isCurrent = currentScore >= band.min && currentScore <= band.max;
             const color = COLOR_VAR[band.color];
             return (
@@ -104,7 +104,7 @@ export function WisHowToReadModal({
 
         <div className="space-y-3 p-5">
           <p className="text-xs font-medium uppercase tracking-wide text-muted">What goes into the score</p>
-          {WISH_FACTOR_INFO.map((f) => (
+          {WIS_FACTOR_INFO.map((f) => (
             <div key={f.label}>
               <p className="text-sm font-medium text-foreground">{f.label}</p>
               <p className="text-xs text-muted">{f.description}</p>

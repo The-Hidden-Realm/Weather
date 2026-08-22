@@ -21,9 +21,15 @@ type ModalState =
   // backing out without completing the action should reopen it instead of
   // just closing everything — easy to recover from an accidental click.
   | { type: "delete"; user: AdminUser; returnToInfo?: boolean }
-  | { type: "role"; user: AdminUser; nextRole: "admin" | "user"; returnToInfo?: boolean }
+  | { type: "role"; user: AdminUser; nextRole: "admin" | "moderator" | "user"; returnToInfo?: boolean }
   | { type: "reset"; user: AdminUser; returnToInfo?: boolean }
   | { type: "info"; user: AdminUser };
+
+const ROLE_LABEL: Record<"admin" | "moderator" | "user", string> = {
+  admin: "Admin",
+  moderator: "Moderator",
+  user: "User",
+};
 
 export function AdminUserTable({
   initialUsers,
@@ -36,6 +42,11 @@ export function AdminUserTable({
   const [error, setError] = useState<string | null>(null);
   const [modal, setModal] = useState<ModalState | null>(null);
   const [query, setQuery] = useState("");
+  const [addUserOpen, setAddUserOpen] = useState(false);
+
+  function handleUserCreated(user: AdminUser) {
+    setUsers((prev) => [...prev, user]);
+  }
 
   const filteredUsers = users.filter((u) => u.username.toLowerCase().includes(query.trim().toLowerCase()));
 
@@ -125,7 +136,7 @@ export function AdminUserTable({
     }
     if (m.type === "role") {
       return {
-        title: `Change ${m.user.username}'s role to ${m.nextRole === "admin" ? "Admin" : "User"}?`,
+        title: `Change ${m.user.username}'s role to ${ROLE_LABEL[m.nextRole]}?`,
         message: "Enter your admin password to confirm this role change.",
         confirmLabel: "Change role",
       };
@@ -145,13 +156,24 @@ export function AdminUserTable({
         </div>
       )}
 
-      <input
-        type="text"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        placeholder="Search users…"
-        className="w-full max-w-xs rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm text-foreground outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/30"
-      />
+      <div className="flex flex-wrap items-center gap-2">
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search users…"
+          className="w-full max-w-xs rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm text-foreground outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/30"
+        />
+        <button
+          type="button"
+          onClick={() => setAddUserOpen(true)}
+          className="ml-auto rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white transition hover:bg-accent-2"
+        >
+          Add user
+        </button>
+      </div>
+
+      {addUserOpen && <AddUserModal onClose={() => setAddUserOpen(false)} onCreated={handleUserCreated} />}
 
       {/* Desktop: full table, unchanged. */}
       <div className="hidden overflow-x-auto rounded-2xl border border-border bg-surface/70 md:block">
@@ -258,6 +280,137 @@ function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
+// Admin types the username + a temp password directly (not auto-generated) —
+// the new account is forced to change it and lands in onboarding right after,
+// same contract as the existing admin password-reset flow.
+function AddUserModal({
+  onClose,
+  onCreated,
+}: {
+  onClose: () => void;
+  onCreated: (user: AdminUser) => void;
+}) {
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [created, setCreated] = useState<{ username: string; password: string } | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setBusy(true);
+    try {
+      const res = await fetch("/api/admin/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Couldn't create user.");
+        return;
+      }
+      onCreated(data.user);
+      setCreated({ username, password });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
+      <div
+        className="w-full max-w-sm rounded-2xl border border-border bg-surface p-5 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {created ? (
+          <>
+            <p className="text-sm font-medium text-foreground">User created</p>
+            <p className="mt-1 text-xs text-muted">
+              Share these credentials with {created.username} — they&rsquo;ll be asked to set a new password on
+              first login.
+            </p>
+            <div className="mt-3 flex items-center gap-2">
+              <code className="flex-1 truncate rounded-md bg-surface-2 px-2 py-1.5 font-mono text-sm text-foreground">
+                {created.username} / {created.password}
+              </code>
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(`${created.username} / ${created.password}`);
+                  setCopied(true);
+                }}
+                className="rounded-lg border border-border px-2.5 py-1.5 text-xs text-muted transition hover:border-accent hover:text-foreground"
+              >
+                {copied ? "Copied!" : "Copy"}
+              </button>
+            </div>
+            <div className="mt-4 flex justify-end">
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white hover:bg-accent-2"
+              >
+                Done
+              </button>
+            </div>
+          </>
+        ) : (
+          <form onSubmit={handleSubmit}>
+            <p className="text-sm font-medium text-foreground">Add user</p>
+            <p className="mt-1 text-xs text-muted">
+              They&rsquo;ll sign in with this password, then be asked to change it and complete onboarding.
+            </p>
+
+            <label className="mb-1.5 mt-3 block text-xs font-medium text-muted">Username</label>
+            <input
+              autoFocus
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              className="w-full rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm text-foreground outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/30"
+              autoComplete="off"
+            />
+
+            <label className="mb-1.5 mt-3 block text-xs font-medium text-muted">Temporary password</label>
+            <input
+              type="text"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm text-foreground outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/30"
+              autoComplete="off"
+            />
+
+            {error && (
+              <div className="mt-3 rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-xs text-danger">
+                {error}
+              </div>
+            )}
+
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded-lg border border-border px-3 py-1.5 text-sm text-muted transition hover:border-accent hover:text-foreground"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={busy || !username || !password}
+                className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white transition hover:bg-accent-2 disabled:opacity-60"
+              >
+                {busy ? "Creating…" : "Create user"}
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function RoleSelect({
   user,
   disabled,
@@ -267,19 +420,24 @@ function RoleSelect({
   user: AdminUser;
   disabled: boolean;
   disabledTitle?: string;
-  onRoleChangeRequest: (role: "admin" | "user") => void;
+  onRoleChangeRequest: (role: "admin" | "moderator" | "user") => void;
 }) {
+  const roleStyle =
+    user.role === "admin"
+      ? "bg-accent/15 text-accent-2"
+      : user.role === "moderator"
+        ? "bg-warn/15 text-warn"
+        : "bg-surface-2 text-muted";
   return (
     <select
       value={user.role}
       disabled={disabled}
       title={disabledTitle}
-      onChange={(e) => onRoleChangeRequest(e.target.value as "admin" | "user")}
-      className={`rounded-full border-0 px-2 py-0.5 text-xs outline-none disabled:opacity-60 ${
-        user.role === "admin" ? "bg-accent/15 text-accent-2" : "bg-surface-2 text-muted"
-      }`}
+      onChange={(e) => onRoleChangeRequest(e.target.value as "admin" | "moderator" | "user")}
+      className={`rounded-full border-0 px-2 py-0.5 text-xs outline-none disabled:opacity-60 ${roleStyle}`}
     >
       <option value="user">User</option>
+      <option value="moderator">Moderator</option>
       <option value="admin">Admin</option>
     </select>
   );
@@ -327,7 +485,7 @@ function UserManagementModal({
 }: {
   user: AdminUser;
   onClose: () => void;
-  onRoleChangeRequest: (role: "admin" | "user") => void;
+  onRoleChangeRequest: (role: "admin" | "moderator" | "user") => void;
   onToggleActive: () => void;
   onToggleFeature: (feature: FeatureKey) => void;
   onResetPasswordRequest: () => void;
@@ -592,7 +750,7 @@ function UserRowItem({
 }: {
   user: AdminUser;
   isSelf: boolean;
-  onRoleChangeRequest: (role: "admin" | "user") => void;
+  onRoleChangeRequest: (role: "admin" | "moderator" | "user") => void;
   onToggleActive: () => void;
   onToggleFeature: (feature: FeatureKey) => void;
   onDeleteRequest: () => void;
@@ -640,7 +798,7 @@ function UserCardItem({
 }: {
   user: AdminUser;
   isSelf: boolean;
-  onRoleChangeRequest: (role: "admin" | "user") => void;
+  onRoleChangeRequest: (role: "admin" | "moderator" | "user") => void;
   onToggleActive: () => void;
   onToggleFeature: (feature: FeatureKey) => void;
   onDeleteRequest: () => void;

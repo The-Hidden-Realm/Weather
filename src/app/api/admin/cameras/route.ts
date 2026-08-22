@@ -17,7 +17,7 @@ function isValidSourceUrl(url: string): boolean {
 // table regardless of whether the admin's own account has that feature on.
 export async function GET() {
   const session = await getSessionUser();
-  if (!session || session.role !== "admin") {
+  if (!session || (session.role !== "admin" && session.role !== "moderator")) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   return NextResponse.json({ cameras: listCameras() });
@@ -25,7 +25,7 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   const session = await getSessionUser();
-  if (!session || session.role !== "admin") {
+  if (!session || (session.role !== "admin" && session.role !== "moderator")) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

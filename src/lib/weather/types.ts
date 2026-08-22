@@ -61,7 +61,7 @@ export type NwsAlert = {
   expires: string;
 };
 
-export type WishScore = {
+export type WisScore = {
   // 0-100 normally, but uncapped above 100 when label is "Life-Threatening"
   // (an active Tornado Warning or similarly dangerous alert).
   score: number;
@@ -80,7 +80,7 @@ export type WeatherPayload = {
   hourly: HourlyPoint[];
   daily: DailyPoint[];
   alerts: NwsAlert[];
-  wish: WishScore;
+  wis: WisScore;
   sunrise: string;
   sunset: string;
   source: { openMeteo: boolean; nws: boolean };

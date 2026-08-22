@@ -1,17 +1,17 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { WishScore } from "@/lib/weather/types";
-import { WISH_BANDS, LIFE_THREATENING_BAND } from "@/lib/weather/wishScore";
+import type { WisScore } from "@/lib/weather/types";
+import { WIS_BANDS, LIFE_THREATENING_BAND } from "@/lib/weather/wisScore";
 import { WisHowToReadModal } from "@/components/WisHowToReadModal";
 
-const COLOR_VAR: Record<WishScore["color"], string> = {
+const COLOR_VAR: Record<WisScore["color"], string> = {
   good: "var(--good)",
   warn: "var(--warn)",
   danger: "var(--danger)",
 };
 
-export function WishGauge({ wish }: { wish: WishScore }) {
+export function WisGauge({ wis }: { wis: WisScore }) {
   const [howToReadOpen, setHowToReadOpen] = useState(false);
   const [warningOpen, setWarningOpen] = useState(false);
   const warningRef = useRef<HTMLDivElement>(null);
@@ -28,11 +28,11 @@ export function WishGauge({ wish }: { wish: WishScore }) {
 
   const radius = 54;
   const circumference = 2 * Math.PI * radius;
-  const isLifeThreatening = wish.label === LIFE_THREATENING_BAND.label;
+  const isLifeThreatening = wis.label === LIFE_THREATENING_BAND.label;
   // The ring itself tops out at 100% full even when the underlying score
   // climbs past 100 in life-threatening mode — the number keeps counting up.
-  const offset = circumference * (1 - Math.min(wish.score, 100) / 100);
-  const color = COLOR_VAR[wish.color];
+  const offset = circumference * (1 - Math.min(wis.score, 100) / 100);
+  const color = COLOR_VAR[wis.color];
 
   return (
     <div className="rounded-2xl border border-border bg-surface/70 p-5">
@@ -90,7 +90,7 @@ export function WishGauge({ wish }: { wish: WishScore }) {
             />
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <span className="text-3xl font-semibold text-foreground">{wish.score}</span>
+            <span className="text-3xl font-semibold text-foreground">{wis.score}</span>
             <span className="text-[10px] uppercase tracking-wide text-muted">
               {isLifeThreatening ? "Uncapped" : "/ 100"}
             </span>
@@ -105,12 +105,12 @@ export function WishGauge({ wish }: { wish: WishScore }) {
             style={{ background: `${color}22`, color }}
           >
             <span className="h-1.5 w-1.5 rounded-full" style={{ background: color }} />
-            {wish.label}
+            {wis.label}
           </div>
           <p className="mt-2 max-w-[16rem] text-sm text-muted">
             {isLifeThreatening
               ? LIFE_THREATENING_BAND.description
-              : WISH_BANDS.find((b) => b.label === wish.label)?.description}
+              : WIS_BANDS.find((b) => b.label === wis.label)?.description}
           </p>
         </div>
       </div>
@@ -133,7 +133,7 @@ export function WishGauge({ wish }: { wish: WishScore }) {
         </p>
       )}
 
-      {wish.alertsUnavailable && (
+      {wis.alertsUnavailable && (
         <p className="mt-4 flex items-start gap-2 rounded-xl border border-warn/40 bg-warn/10 p-3 text-xs text-warn">
           <svg
             width="14"
@@ -152,8 +152,8 @@ export function WishGauge({ wish }: { wish: WishScore }) {
 
       {howToReadOpen && (
         <WisHowToReadModal
-          currentScore={wish.score}
-          alertsUnavailable={wish.alertsUnavailable}
+          currentScore={wis.score}
+          alertsUnavailable={wis.alertsUnavailable}
           onClose={() => setHowToReadOpen(false)}
         />
       )}

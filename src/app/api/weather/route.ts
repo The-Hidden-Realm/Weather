@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fetchOpenMeteoForecast } from "@/lib/weather/openMeteo";
 import { fetchNwsAlerts } from "@/lib/weather/nws";
-import { computeWishScore } from "@/lib/weather/wishScore";
+import { computeWisScore } from "@/lib/weather/wisScore";
 import type { WeatherPayload } from "@/lib/weather/types";
 
 export async function GET(req: NextRequest) {
@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
     ]);
 
     const today = forecast.daily[0];
-    const wish = computeWishScore(forecast.current, today, nws.alerts, forecast.hourly, nws.ok);
+    const wis = computeWisScore(forecast.current, today, nws.alerts, forecast.hourly, nws.ok, lat);
 
     const payload: WeatherPayload = {
       location: { label, lat, lon, timezone: forecast.timezone },
@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
       hourly: forecast.hourly,
       daily: forecast.daily,
       alerts: nws.alerts,
-      wish,
+      wis,
       sunrise: today?.sunrise ?? "",
       sunset: today?.sunset ?? "",
       source: { openMeteo: true, nws: nws.ok },

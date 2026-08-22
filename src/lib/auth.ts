@@ -1,7 +1,7 @@
 import bcrypt from "bcryptjs";
 import { randomBytes } from "node:crypto";
 import { getDb, type UserRow } from "@/lib/db";
-import { getSessionUser, clearSessionCookie, type SessionPayload } from "@/lib/session";
+import { getSessionUser, type SessionPayload } from "@/lib/session";
 
 export {
   SESSION_COOKIE_NAME,
@@ -44,12 +44,18 @@ export function pushFeaturesToAllUsers(features: FeatureKey[]): number {
 // Re-checks the DB (not just the JWT) so an admin deactivating an account, or
 // changing feature access, takes effect on this user's very next page load,
 // not just their next login.
+//
+// Deliberately does NOT clear the session cookie itself: this is called from
+// both Server Components (pages) and Route Handlers, and Next.js only allows
+// cookie mutation from the latter — clearing it here would throw when called
+// during a page render. Returning null is enough for every caller to treat
+// the request as unauthenticated; the stale cookie is harmless and gets
+// overwritten the next time this user (or anyone else) logs in.
 export async function getActiveSessionUser(): Promise<(SessionPayload & { enabledFeatures: FeatureKey[] }) | null> {
   const session = await getSessionUser();
   if (!session) return null;
   const user = findUserById(session.userId);
   if (!user || user.is_active === 0) {
-    await clearSessionCookie();
     return null;
   }
   return { ...session, enabledFeatures: getUserFeatures(user) };
@@ -65,12 +71,31 @@ export function findUserById(id: number): UserRow | undefined {
   return getDb().prepare("SELECT * FROM users WHERE id = ?").get(id) as UserRow | undefined;
 }
 
-export function createUser(username: string, password: string, role: "admin" | "user" = "user"): UserRow {
+export function createUser(
+  username: string,
+  password: string,
+  role: "admin" | "moderator" | "user" = "user"
+): UserRow {
   const hash = bcrypt.hashSync(password, 10);
   const db = getDb();
   const info = db
     .prepare("INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)")
     .run(username, hash, role);
+  return db.prepare("SELECT * FROM users WHERE id = ?").get(info.lastInsertRowid) as UserRow;
+}
+
+// Admin-created accounts always start as role 'user' (promote via setUserRole
+// afterward) and with a temp password that forces a change on first login —
+// same contract as adminResetPassword, just combined into the initial INSERT
+// instead of a follow-up UPDATE.
+export function adminCreateUser(username: string, tempPassword: string): UserRow {
+  const hash = bcrypt.hashSync(tempPassword, 10);
+  const db = getDb();
+  const info = db
+    .prepare(
+      "INSERT INTO users (username, password_hash, role, must_change_password, must_change_password_reason) VALUES (?, ?, 'user', 1, 'admin_reset')"
+    )
+    .run(username, hash);
   return db.prepare("SELECT * FROM users WHERE id = ?").get(info.lastInsertRowid) as UserRow;
 }
 
@@ -142,7 +167,7 @@ export function setUserActive(userId: number, active: boolean) {
   getDb().prepare("UPDATE users SET is_active = ? WHERE id = ?").run(active ? 1 : 0, userId);
 }
 
-export function setUserRole(userId: number, role: "admin" | "user") {
+export function setUserRole(userId: number, role: "admin" | "moderator" | "user") {
   getDb().prepare("UPDATE users SET role = ? WHERE id = ?").run(role, userId);
 }
 

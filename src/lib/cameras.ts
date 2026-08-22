@@ -1,4 +1,4 @@
-import { getDb, type CameraRow } from "@/lib/db";
+import { getDb, type CameraRow, type CameraRemovalRequestRow } from "@/lib/db";
 import { MAX_CAMERA_SLOTS, isCameraLayoutMode, type CameraLayoutMode } from "@/lib/camera-utils";
 
 // Sized for the largest layout mode (9) so a saved slot assignment survives
@@ -116,6 +116,49 @@ export function updateCamera(
 
 export function deleteCamera(id: number) {
   getDb().prepare("DELETE FROM cameras WHERE id = ?").run(id);
+}
+
+// A moderator can't delete a camera outright — this queues a request for an
+// admin to approve (which deletes it, see resolveRemovalRequest below via
+// the API route) or deny (camera stays, request just marked resolved).
+export function createRemovalRequest(cameraId: number, requestedBy: number): CameraRemovalRequestRow {
+  const db = getDb();
+  const info = db
+    .prepare("INSERT INTO camera_removal_requests (camera_id, requested_by) VALUES (?, ?)")
+    .run(cameraId, requestedBy);
+  return db
+    .prepare("SELECT * FROM camera_removal_requests WHERE id = ?")
+    .get(info.lastInsertRowid) as CameraRemovalRequestRow;
+}
+
+export function listPendingRemovalRequests(): (CameraRemovalRequestRow & {
+  camera_name: string;
+  requested_by_username: string;
+})[] {
+  return getDb()
+    .prepare(
+      `SELECT r.*, c.name as camera_name, u.username as requested_by_username
+       FROM camera_removal_requests r
+       JOIN cameras c ON c.id = r.camera_id
+       JOIN users u ON u.id = r.requested_by
+       WHERE r.status = 'pending'
+       ORDER BY r.requested_at ASC`
+    )
+    .all() as (CameraRemovalRequestRow & { camera_name: string; requested_by_username: string })[];
+}
+
+export function findRemovalRequestById(id: number): CameraRemovalRequestRow | undefined {
+  return getDb().prepare("SELECT * FROM camera_removal_requests WHERE id = ?").get(id) as
+    | CameraRemovalRequestRow
+    | undefined;
+}
+
+export function resolveRemovalRequest(id: number, status: "approved" | "denied", resolvedBy: number) {
+  getDb()
+    .prepare(
+      "UPDATE camera_removal_requests SET status = ?, resolved_at = datetime('now'), resolved_by = ? WHERE id = ?"
+    )
+    .run(status, resolvedBy, id);
 }
 
 // Returns a fixed-length array of camera ids (or null for an empty slot),

@@ -44,8 +44,8 @@ export async function proxy(req: NextRequest) {
     }
   }
 
-  if (pathname.startsWith("/admin") && session.role !== "admin") {
-    return NextResponse.redirect(new URL("/", req.url));
+  if (pathname.startsWith("/admin") && session.role !== "admin" && session.role !== "moderator") {
+    return NextResponse.redirect(new URL("/access-denied", req.url));
   }
 
   return NextResponse.next();

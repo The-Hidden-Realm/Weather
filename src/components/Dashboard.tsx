@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { GeocodeResult, WeatherPayload } from "@/lib/weather/types";
 import { resolveLocation } from "@/lib/resolveLocation";
 import { LocationHeader } from "@/components/LocationHeader";
-import { WishGauge } from "@/components/WishGauge";
+import { WisGauge } from "@/components/WisGauge";
 import { CurrentConditionsCard } from "@/components/CurrentConditionsCard";
 import { HourlyForecast } from "@/components/HourlyForecast";
 import { SevenDayForecast } from "@/components/SevenDayForecast";
@@ -265,7 +265,7 @@ export function Dashboard({
             </div>
 
             <div className="min-w-0 flex flex-col gap-5 self-start">
-              <WishGauge wish={weather.wish} />
+              <WisGauge wis={weather.wis} />
               <div className="hidden lg:block">
                 <SunriseSunsetTiles
                   sunrise={weather.sunrise}
