@@ -1,44 +1,126 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { CameraRow } from "@/lib/db";
 import { CameraTile } from "@/components/CameraTile";
+import { CAMERA_LAYOUTS, CAMERA_LAYOUT_MODES, type CameraLayoutMode } from "@/lib/camera-utils";
 
-const SLOT_AREAS = ["big", "s1", "s2", "s3", "s4", "s5"];
-// Stagger tile stream start-up so all 6 feeds aren't fighting for bandwidth
-// and connections the instant the page loads — the primary tile starts
+// Stagger tile stream start-up so all feeds aren't fighting for bandwidth and
+// connections the instant the page loads — the primary tile starts
 // immediately, the rest follow shortly after.
 const STAGGER_MS = 200;
+
+function LayoutModeSelect({
+  value,
+  onChange,
+}: {
+  value: CameraLayoutMode;
+  onChange: (mode: CameraLayoutMode) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function onClickOutside(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, []);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        className="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs text-muted transition hover:border-accent hover:text-foreground"
+      >
+        {CAMERA_LAYOUTS[value].label}
+        <svg
+          width="10"
+          height="10"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          className={`transition-transform ${open ? "rotate-180" : ""}`}
+        >
+          <path d="m6 9 6 6 6-6" />
+        </svg>
+      </button>
+
+      {open && (
+        <div
+          role="listbox"
+          className="absolute left-0 top-full z-20 mt-1 w-28 overflow-hidden rounded-md border border-border bg-surface-2 shadow-xl"
+        >
+          {CAMERA_LAYOUT_MODES.map((mode) => (
+            <button
+              key={mode}
+              type="button"
+              role="option"
+              aria-selected={value === mode}
+              onClick={() => {
+                onChange(mode);
+                setOpen(false);
+              }}
+              className={`block w-full px-3 py-1.5 text-left text-xs transition hover:bg-accent/10 ${
+                value === mode ? "text-accent-2" : "text-foreground"
+              }`}
+            >
+              {CAMERA_LAYOUTS[mode].label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function CameraGrid({
   layout,
   camerasById,
+  layoutMode,
+  onLayoutModeChange,
   selectedSlot,
   onSelectSlot,
   isFullscreen,
   onToggleFullscreen,
   panelOpen,
   onTogglePanel,
-  onDropCamera,
-  onSwapSlots,
+  dragOverSlot,
+  draggingSlot,
+  onTileDragStart,
   onRemoveSlot,
 }: {
   layout: (number | null)[];
   camerasById: Map<number, CameraRow>;
+  layoutMode: CameraLayoutMode;
+  onLayoutModeChange: (mode: CameraLayoutMode) => void;
   selectedSlot: number;
   onSelectSlot: (slot: number) => void;
   isFullscreen: boolean;
   onToggleFullscreen: () => void;
   panelOpen: boolean;
   onTogglePanel: () => void;
-  onDropCamera: (slot: number, cameraId: number) => void;
-  onSwapSlots: (fromSlot: number, toSlot: number) => void;
+  // Which slot a drag in progress is currently hovering, if any.
+  dragOverSlot: number | null;
+  // Which slot's own camera is the thing currently being dragged, if any.
+  draggingSlot: number | null;
+  onTileDragStart: (slot: number, e: React.PointerEvent) => void;
   onRemoveSlot: (slot: number) => void;
 }) {
-  const [readySlots, setReadySlots] = useState<boolean[]>(() => new Array(SLOT_AREAS.length).fill(false));
+  const { slotAreas, gridTemplateColumns, gridTemplateRows, gridTemplateAreas } = CAMERA_LAYOUTS[layoutMode];
+  const [readySlots, setReadySlots] = useState<boolean[]>(() => new Array(slotAreas.length).fill(false));
 
   useEffect(() => {
-    const timers = SLOT_AREAS.map((_, i) =>
+    // Restart the stagger whenever the slot count changes (layout mode
+    // switch) so newly-added tiles get their own staggered start too.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setReadySlots(new Array(slotAreas.length).fill(false));
+    const timers = slotAreas.map((_, i) =>
       window.setTimeout(() => {
         setReadySlots((prev) => {
           if (prev[i]) return prev;
@@ -49,21 +131,27 @@ export function CameraGrid({
       }, i * STAGGER_MS)
     );
     return () => timers.forEach(window.clearTimeout);
-  }, []);
+    // slotAreas.length is what actually changes tile count; the array
+    // identity itself changes every render, so length is the real dep.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slotAreas.length]);
 
   return (
     <div
-      className={`relative flex flex-col rounded-2xl border border-border bg-surface/70 p-3 ${
-        isFullscreen ? "h-full bg-background p-4" : ""
+      className={`relative flex flex-col rounded-lg border border-border bg-surface/70 p-2.5 ${
+        isFullscreen ? "h-full bg-background p-3" : ""
       }`}
     >
-      <div className="mb-2 flex items-center justify-between">
-        <h2 className="text-sm font-medium text-muted">CCTV view</h2>
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <h2 className="text-sm font-medium text-muted">CCTV view</h2>
+          <LayoutModeSelect value={layoutMode} onChange={onLayoutModeChange} />
+        </div>
         <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={onToggleFullscreen}
-            className="flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1 text-xs text-muted transition hover:border-accent hover:text-foreground"
+            className="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs text-muted transition hover:border-accent hover:text-foreground"
           >
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               {isFullscreen ? (
@@ -80,7 +168,7 @@ export function CameraGrid({
               onClick={onTogglePanel}
               aria-label={panelOpen ? "Hide camera list" : "Show camera list"}
               aria-pressed={panelOpen}
-              className={`flex items-center rounded-lg border p-1.5 transition ${
+              className={`flex items-center rounded-md border p-1.5 transition ${
                 panelOpen
                   ? "border-accent bg-accent/10 text-foreground"
                   : "border-border text-muted hover:border-accent hover:text-foreground"
@@ -95,14 +183,10 @@ export function CameraGrid({
       </div>
 
       <div
-        className={`grid flex-1 gap-2 ${isFullscreen ? "min-h-0" : "aspect-[16/10]"}`}
-        style={{
-          gridTemplateColumns: "repeat(3, 1fr)",
-          gridTemplateRows: "repeat(3, 1fr)",
-          gridTemplateAreas: '"big big s1" "big big s2" "s3 s4 s5"',
-        }}
+        className={`grid flex-1 gap-1.5 ${isFullscreen ? "min-h-0" : "aspect-[16/10]"}`}
+        style={{ gridTemplateColumns, gridTemplateRows, gridTemplateAreas }}
       >
-        {SLOT_AREAS.map((area, slot) => {
+        {slotAreas.map((area, slot) => {
           const cameraId = layout[slot];
           const camera = cameraId != null ? camerasById.get(cameraId) ?? null : null;
           return (
@@ -113,9 +197,10 @@ export function CameraGrid({
               slot={slot}
               active={selectedSlot === slot}
               pending={!readySlots[slot]}
+              isDragOver={dragOverSlot === slot}
+              isBeingDragged={draggingSlot === slot}
               onClick={() => onSelectSlot(slot)}
-              onDropCamera={onDropCamera}
-              onSwapSlots={onSwapSlots}
+              onDragStart={(e) => onTileDragStart(slot, e)}
               onRemove={onRemoveSlot}
             />
           );

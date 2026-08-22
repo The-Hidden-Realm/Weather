@@ -14,8 +14,10 @@ export function CameraSidePanel({
   cameras,
   categories,
   isAdmin,
+  draggingCameraId,
   onClose,
   onPickCamera,
+  onDragCameraStart,
   onAddCamera,
   onEditCamera,
   onDeleteCamera,
@@ -24,8 +26,13 @@ export function CameraSidePanel({
   cameras: CameraRow[];
   categories: string[];
   isAdmin: boolean;
+  // Which camera (if any) is currently being dragged out of this list.
+  draggingCameraId: number | null;
   onClose?: () => void;
   onPickCamera: (camera: CameraRow) => void;
+  // Starts a pointer-based drag of this camera toward a grid slot — see
+  // CameraDashboard, which owns the actual drag state and drop handling.
+  onDragCameraStart: (cameraId: number, e: React.PointerEvent) => void;
   onAddCamera: () => void;
   onEditCamera: (camera: CameraRow) => void;
   onDeleteCamera: (camera: CameraRow) => void;
@@ -203,15 +210,15 @@ export function CameraSidePanel({
         {filtered.map((camera) => (
           <div
             key={camera.id}
-            draggable
-            onDragStart={(e) => {
+            onPointerDown={(e) => {
               cancelPreview();
-              e.dataTransfer.effectAllowed = "copy";
-              e.dataTransfer.setData("application/json", JSON.stringify({ type: "camera", cameraId: camera.id }));
+              onDragCameraStart(camera.id, e);
             }}
             onMouseEnter={(e) => schedulePreview(camera, e.currentTarget)}
             onMouseLeave={cancelPreview}
-            className="cursor-grab rounded-xl border border-border/60 bg-surface-2/60 p-2.5 transition hover:border-accent/50 active:cursor-grabbing"
+            className={`cursor-grab rounded-xl border border-border/60 bg-surface-2/60 p-2.5 transition hover:border-accent/50 active:cursor-grabbing ${
+              draggingCameraId === camera.id ? "opacity-40" : ""
+            }`}
           >
             <button type="button" onClick={() => onPickCamera(camera)} className="block w-full text-left">
               <p className="text-sm font-medium text-foreground">{camera.name}</p>
@@ -225,6 +232,7 @@ export function CameraSidePanel({
                 <button
                   type="button"
                   onClick={() => onEditCamera(camera)}
+                  onPointerDown={(e) => e.stopPropagation()}
                   className="text-xs text-accent-2 hover:underline"
                 >
                   Edit
@@ -232,6 +240,7 @@ export function CameraSidePanel({
                 <button
                   type="button"
                   onClick={() => onDeleteCamera(camera)}
+                  onPointerDown={(e) => e.stopPropagation()}
                   className="text-xs text-danger hover:underline"
                 >
                   Delete

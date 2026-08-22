@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import type { CameraRow } from "@/lib/db";
-import { isDirectVideoSource } from "@/lib/camera-utils";
+import { isDirectVideoSource, isYouTubeEmbedUrl, postYouTubeCommand } from "@/lib/camera-utils";
 
 export type CameraDragData =
   | { type: "slot"; slot: number }
@@ -14,9 +14,10 @@ export function CameraTile({
   slot,
   active,
   pending = false,
+  isDragOver = false,
+  isBeingDragged = false,
   onClick,
-  onDropCamera,
-  onSwapSlots,
+  onDragStart,
   onRemove,
 }: {
   camera: CameraRow | null;
@@ -24,20 +25,26 @@ export function CameraTile({
   slot: number;
   active: boolean;
   pending?: boolean;
+  // True while a drag in progress is currently hovering this tile.
+  isDragOver?: boolean;
+  // True while this tile's own camera is the thing currently being dragged.
+  isBeingDragged?: boolean;
   onClick: () => void;
-  onDropCamera: (slot: number, cameraId: number) => void;
-  onSwapSlots: (fromSlot: number, toSlot: number) => void;
+  // Starts a pointer-based drag of this tile's own camera — see
+  // CameraDashboard, which owns the actual drag state and drop handling.
+  onDragStart: (e: React.PointerEvent) => void;
   onRemove: (slot: number) => void;
 }) {
   const [muted, setMuted] = useState(true);
-  const [dragOver, setDragOver] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const [streamLoaded, setStreamLoaded] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
   const isDirectVideo = camera ? isDirectVideoSource(camera.source_url) : false;
   const hasAudioLink = !!camera?.audio_url;
-  const canMute = !!camera && (isDirectVideo || hasAudioLink);
+  const isYouTubeEmbed = camera ? isYouTubeEmbedUrl(camera.source_url) : false;
+  const canMute = !!camera && (isDirectVideo || hasAudioLink || isYouTubeEmbed);
   const showStream = !!camera && !pending;
 
   // Reset the "loaded" flag whenever the stream identity changes — done
@@ -48,12 +55,21 @@ export function CameraTile({
   if (loadToken !== prevLoadToken) {
     setPrevLoadToken(loadToken);
     setStreamLoaded(false);
+    // A YouTube embed always reloads muted (baked into its base URL, since
+    // autoplay-with-sound isn't allowed) — reset the icon to match, instead
+    // of it drifting out of sync with what's actually playing after a
+    // refresh or a different camera swapping into this slot. Video/audio
+    // sources don't need this: their real .muted keeps working across a
+    // reload via the ref, independent of any URL.
+    if (isYouTubeEmbed) setMuted(true);
   }
 
   // Set .muted directly on the media elements (rather than relying solely on
   // the React prop) and explicitly resume playback on unmute — this is the
   // reliable pattern for getting sound to actually start after autoplay was
-  // forced to start muted.
+  // forced to start muted. YouTube gets a real-time postMessage command
+  // instead — rewriting its `mute` URL param would force the iframe to
+  // reload from scratch every time, which is slow and drops the stream.
   function toggleMute(e: React.MouseEvent) {
     e.stopPropagation();
     setMuted((prev) => {
@@ -66,47 +82,18 @@ export function CameraTile({
         audioRef.current.muted = next;
         if (!next) audioRef.current.play().catch(() => {});
       }
+      if (iframeRef.current && isYouTubeEmbed) {
+        postYouTubeCommand(iframeRef.current, next ? "mute" : "unMute");
+      }
       return next;
     });
-  }
-
-  function handleDragStart(e: React.DragEvent) {
-    if (!camera) {
-      e.preventDefault();
-      return;
-    }
-    e.dataTransfer.effectAllowed = "move";
-    e.dataTransfer.setData("application/json", JSON.stringify({ type: "slot", slot }));
-  }
-
-  function handleDragOver(e: React.DragEvent) {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "move";
-    setDragOver(true);
-  }
-
-  function handleDrop(e: React.DragEvent) {
-    e.preventDefault();
-    setDragOver(false);
-    const raw = e.dataTransfer.getData("application/json");
-    if (!raw) return;
-    let data: CameraDragData;
-    try {
-      data = JSON.parse(raw);
-    } catch {
-      return;
-    }
-    if (data.type === "slot") {
-      onSwapSlots(data.slot, slot);
-    } else if (data.type === "camera") {
-      onDropCamera(slot, data.cameraId);
-    }
   }
 
   return (
     <div
       role="button"
       tabIndex={0}
+      data-camera-slot={slot}
       onClick={onClick}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
@@ -114,17 +101,17 @@ export function CameraTile({
           onClick();
         }
       }}
-      draggable={!!camera}
-      onDragStart={handleDragStart}
-      onDragOver={handleDragOver}
-      onDragLeave={() => setDragOver(false)}
-      onDrop={handleDrop}
+      onPointerDown={(e) => {
+        if (camera) onDragStart(e);
+      }}
       style={{ gridArea: area }}
-      className={`group relative min-h-0 cursor-pointer overflow-hidden rounded-xl border bg-black text-left transition ${
-        dragOver
+      className={`group relative min-h-0 overflow-hidden rounded-md border bg-black text-left transition ${
+        camera ? "cursor-grab" : "cursor-pointer"
+      } ${isBeingDragged ? "opacity-40" : ""} ${
+        isDragOver
           ? "border-accent ring-2 ring-accent"
           : active
-            ? "border-accent ring-2 ring-accent/40"
+            ? "border-accent ring-1 ring-accent/40"
             : "border-border/60 hover:border-accent/50"
       }`}
     >
@@ -146,10 +133,14 @@ export function CameraTile({
             ) : (
               <iframe
                 key={`${camera.source_url}-${reloadKey}`}
+                ref={iframeRef}
                 src={camera.source_url}
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
                 onLoad={() => setStreamLoaded(true)}
-                className="h-full w-full border-0"
+                // No hover/click interactivity of its own — the tile's own
+                // buttons (mute, refresh, remove) are the only controls;
+                // clicks pass through to select this tile like everywhere else.
+                className="pointer-events-none h-full w-full border-0"
               />
             ))}
 
@@ -185,12 +176,25 @@ export function CameraTile({
             </span>
             <div className="pointer-events-auto flex items-center gap-1">
               {canMute && (
-                <span className="rounded-md bg-black/60 px-1.5 py-0.5 text-white">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M11 5 6 9H2v6h4l5 4V5Z" />
-                    <path d="M16.5 8.5a5 5 0 0 1 0 7" stroke="currentColor" strokeWidth="1.8" fill="none" />
-                  </svg>
-                </span>
+                <button
+                  type="button"
+                  onClick={toggleMute}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  aria-label={muted ? "Unmute" : "Mute"}
+                  className="rounded-md bg-black/60 p-1 text-white opacity-0 transition hover:bg-accent/80 group-hover:opacity-100"
+                >
+                  {muted ? (
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M11 5 6 9H2v6h4l5 4V5Z" />
+                      <path d="m23 9-6 6M17 9l6 6" />
+                    </svg>
+                  ) : (
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M11 5 6 9H2v6h4l5 4V5Z" />
+                      <path d="M16.5 8.5a5 5 0 0 1 0 7M19.5 5.5a9 9 0 0 1 0 13" />
+                    </svg>
+                  )}
+                </button>
               )}
               <button
                 type="button"
@@ -198,6 +202,7 @@ export function CameraTile({
                   e.stopPropagation();
                   setReloadKey((k) => k + 1);
                 }}
+                onPointerDown={(e) => e.stopPropagation()}
                 aria-label="Refresh camera feed"
                 className="rounded-md bg-black/60 p-1 text-white opacity-0 transition hover:bg-accent/80 group-hover:opacity-100"
               >
@@ -212,6 +217,7 @@ export function CameraTile({
                   e.stopPropagation();
                   onRemove(slot);
                 }}
+                onPointerDown={(e) => e.stopPropagation()}
                 aria-label="Remove camera from slot"
                 className="rounded-md bg-black/60 p-1 text-white opacity-0 transition hover:bg-danger/80 group-hover:opacity-100"
               >
@@ -221,39 +227,18 @@ export function CameraTile({
               </button>
             </div>
           </div>
-
-          {canMute && (
-            <button
-              type="button"
-              onClick={toggleMute}
-              aria-label={muted ? "Unmute" : "Mute"}
-              className="absolute bottom-2 right-2 rounded-md bg-black/60 p-1.5 text-white opacity-0 transition group-hover:opacity-100"
-            >
-              {muted ? (
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M11 5 6 9H2v6h4l5 4V5Z" />
-                  <path d="m23 9-6 6M17 9l6 6" />
-                </svg>
-              ) : (
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M11 5 6 9H2v6h4l5 4V5Z" />
-                  <path d="M16.5 8.5a5 5 0 0 1 0 7M19.5 5.5a9 9 0 0 1 0 13" />
-                </svg>
-              )}
-            </button>
-          )}
         </>
       ) : (
         <div
           className={`flex h-full w-full flex-col items-center justify-center gap-1 text-muted ${
-            dragOver ? "text-accent" : ""
+            isDragOver ? "text-accent" : ""
           }`}
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
             <rect x="2" y="6" width="14" height="12" rx="2" />
             <path d="m22 8-6 4 6 4V8Z" />
           </svg>
-          <span className="text-xs">{dragOver ? "Drop to assign" : "Select a camera"}</span>
+          <span className="text-xs">{isDragOver ? "Drop to assign" : "Select a camera"}</span>
         </div>
       )}
     </div>

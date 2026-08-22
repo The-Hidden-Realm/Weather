@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getActiveSessionUser } from "@/lib/auth";
-import { CAMERA_SLOT_COUNT, findCameraById, getCameraLayout, setCameraLayoutSlot } from "@/lib/cameras";
+import {
+  CAMERA_SLOT_COUNT,
+  findCameraById,
+  getCameraLayout,
+  setCameraLayoutSlot,
+  getCameraLayoutMode,
+  setCameraLayoutMode,
+} from "@/lib/cameras";
+import { isCameraLayoutMode } from "@/lib/camera-utils";
 
 export async function GET() {
   const session = await getActiveSessionUser();
@@ -9,11 +17,33 @@ export async function GET() {
     return NextResponse.json({ error: "This feature isn't enabled for your account." }, { status: 403 });
   }
 
-  return NextResponse.json({ layout: getCameraLayout(session.userId) });
+  return NextResponse.json({
+    layout: getCameraLayout(session.userId),
+    mode: getCameraLayoutMode(session.userId),
+  });
+}
+
+// Switches how many tiles the caller's own grid shows (1/4/6/9) — every
+// user picks their own layout independently, same as their slot assignments.
+export async function PATCH(req: NextRequest) {
+  const session = await getActiveSessionUser();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!session.enabledFeatures.includes("cameras")) {
+    return NextResponse.json({ error: "This feature isn't enabled for your account." }, { status: 403 });
+  }
+
+  const body = await req.json();
+  const mode = Number(body.mode);
+  if (!isCameraLayoutMode(mode)) {
+    return NextResponse.json({ error: "Invalid layout mode." }, { status: 400 });
+  }
+
+  setCameraLayoutMode(session.userId, mode);
+  return NextResponse.json({ ok: true, mode });
 }
 
 // Assigns one camera (or clears it) to one slot in the caller's own
-// 6-tile view — every user manages their own layout independently.
+// grid — every user manages their own layout independently.
 export async function PUT(req: NextRequest) {
   const session = await getActiveSessionUser();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

@@ -1,6 +1,9 @@
 import { getDb, type CameraRow } from "@/lib/db";
+import { MAX_CAMERA_SLOTS, isCameraLayoutMode, type CameraLayoutMode } from "@/lib/camera-utils";
 
-export const CAMERA_SLOT_COUNT = 6;
+// Sized for the largest layout mode (9) so a saved slot assignment survives
+// switching down to a smaller mode and back up.
+export const CAMERA_SLOT_COUNT = MAX_CAMERA_SLOTS;
 
 export function listCameras(): CameraRow[] {
   return getDb().prepare("SELECT * FROM cameras ORDER BY category ASC, name ASC").all() as CameraRow[];
@@ -79,4 +82,15 @@ export function setCameraLayoutSlot(userId: number, slot: number, cameraId: numb
        ON CONFLICT(user_id, slot) DO UPDATE SET camera_id = excluded.camera_id`
     )
     .run(userId, slot, cameraId);
+}
+
+export function getCameraLayoutMode(userId: number): CameraLayoutMode {
+  const row = getDb().prepare("SELECT camera_layout_mode FROM users WHERE id = ?").get(userId) as
+    | { camera_layout_mode: number }
+    | undefined;
+  return row && isCameraLayoutMode(row.camera_layout_mode) ? row.camera_layout_mode : 6;
+}
+
+export function setCameraLayoutMode(userId: number, mode: CameraLayoutMode) {
+  getDb().prepare("UPDATE users SET camera_layout_mode = ? WHERE id = ?").run(mode, userId);
 }

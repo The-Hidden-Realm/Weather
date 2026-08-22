@@ -132,6 +132,14 @@ function ensureCameraAudioUrlColumn(db: Database.Database) {
   db.exec("ALTER TABLE cameras ADD COLUMN audio_url TEXT");
 }
 
+// How many tiles the CCTV grid shows for this user (1/4/6/9) — independent
+// of which camera is assigned to which slot in camera_layout below.
+function ensureCameraLayoutModeColumn(db: Database.Database) {
+  const columns = db.prepare("PRAGMA table_info(users)").all() as { name: string }[];
+  if (columns.some((c) => c.name === "camera_layout_mode")) return;
+  db.exec("ALTER TABLE users ADD COLUMN camera_layout_mode INTEGER NOT NULL DEFAULT 6");
+}
+
 // Only a bcrypt hash of the admin recovery key is ever stored — same
 // treatment as a password, since it's a bearer secret that resets one.
 // NULL means the feature is unconfigured/off.
@@ -273,6 +281,7 @@ function init(): Database.Database {
   ensureAdminControlColumns(db);
   ensureOnboardingColumns(db);
   ensureCameraAudioUrlColumn(db);
+  ensureCameraLayoutModeColumn(db);
   ensureAdminRecoveryKeyColumn(db);
   ensureTestCameras(db);
 
@@ -320,6 +329,7 @@ export type UserRow = {
   first_name: string;
   email: string;
   onboarding_completed: number;
+  camera_layout_mode: number;
   created_at: string;
 };
 
