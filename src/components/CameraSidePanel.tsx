@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { CameraRow } from "@/lib/db";
-import { isDirectVideoSource } from "@/lib/camera-utils";
+import { HazcamsFrame } from "@/components/CameraTile";
+import { isDirectVideoSource, isHazcamsUrl } from "@/lib/camera-utils";
 
 const PREVIEW_HOVER_DELAY = 250;
 const PREVIEW_WIDTH = 220;
@@ -272,7 +273,7 @@ export function CameraSidePanel({
           className="pointer-events-none fixed z-50 overflow-hidden rounded-lg border border-border bg-black shadow-2xl"
           style={{ top: preview.top, left: preview.left, width: PREVIEW_WIDTH }}
         >
-          <div className="aspect-video w-full bg-black">
+          <div className="relative aspect-video w-full bg-black">
             {preview.camera.is_offline === 1 ? (
               <div className="flex h-full w-full flex-col items-center justify-center gap-1.5 bg-black/90">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-danger">
@@ -292,6 +293,8 @@ export function CameraSidePanel({
                 playsInline
                 className="h-full w-full object-cover"
               />
+            ) : isHazcamsUrl(preview.camera.source_url) ? (
+              <HazcamsFrame key={preview.camera.source_url} src={preview.camera.source_url} />
             ) : (
               <iframe
                 key={preview.camera.source_url}
