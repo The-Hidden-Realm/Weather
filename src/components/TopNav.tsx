@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import type { SessionPayload } from "@/lib/session";
 import type { FeatureKey } from "@/lib/features";
 import { AlertsBell } from "@/components/AlertsBell";
+import { CameraAdminDialog } from "@/components/CameraAdminDialog";
 
 const NAV_LINKS: { href: string; label: string; feature: FeatureKey | null }[] = [
   { href: "/", label: "Home", feature: null },
@@ -42,8 +43,10 @@ export function TopNav({ session }: { session: SessionPayload & { enabledFeature
   const [open, setOpen] = useState(false);
   const [toolsOpen, setToolsOpen] = useState(false);
   const [enabledFeatures, setEnabledFeatures] = useState(session.enabledFeatures);
+  const [cameraAdminOpen, setCameraAdminOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const toolsRef = useRef<HTMLDivElement>(null);
+  const isAdmin = session.role === "admin";
 
   useEffect(() => {
     function onClickOutside(e: MouseEvent) {
@@ -81,6 +84,21 @@ export function TopNav({ session }: { session: SessionPayload & { enabledFeature
       clearInterval(interval);
     };
   }, []);
+
+  // Hidden admin shortcut — opens the camera controls dialog (mark a camera
+  // offline, mark a category private) from any page that has this header,
+  // i.e. everywhere except the pre-login pages.
+  useEffect(() => {
+    if (!isAdmin) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.ctrlKey && e.shiftKey && (e.key === "C" || e.key === "c")) {
+        e.preventDefault();
+        setCameraAdminOpen(true);
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isAdmin]);
 
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -191,7 +209,7 @@ export function TopNav({ session }: { session: SessionPayload & { enabledFeature
                   Settings
                 </Link>
 
-                {session.role === "admin" && (
+                {isAdmin && (
                   <Link
                     href="/admin"
                     onClick={() => setOpen(false)}
@@ -220,6 +238,8 @@ export function TopNav({ session }: { session: SessionPayload & { enabledFeature
           </div>
         </div>
       </div>
+
+      {isAdmin && <CameraAdminDialog open={cameraAdminOpen} onClose={() => setCameraAdminOpen(false)} />}
     </header>
   );
 }

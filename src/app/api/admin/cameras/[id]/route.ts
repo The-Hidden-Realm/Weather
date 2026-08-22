@@ -25,7 +25,13 @@ export async function PATCH(req: NextRequest, ctx: RouteContext<"/api/admin/came
   }
 
   const body = await req.json();
-  const patch: { name?: string; category?: string; sourceUrl?: string; audioUrl?: string | null } = {};
+  const patch: {
+    name?: string;
+    category?: string;
+    sourceUrl?: string;
+    audioUrl?: string | null;
+    isOffline?: boolean;
+  } = {};
 
   if (typeof body.name === "string") {
     const name = body.name.trim();
@@ -51,6 +57,9 @@ export async function PATCH(req: NextRequest, ctx: RouteContext<"/api/admin/came
       return NextResponse.json({ error: "Audio link must be a valid http(s) URL." }, { status: 400 });
     }
     patch.audioUrl = audioUrl || null;
+  }
+  if (typeof body.isOffline === "boolean") {
+    patch.isOffline = body.isOffline;
   }
 
   updateCamera(cameraId, patch);

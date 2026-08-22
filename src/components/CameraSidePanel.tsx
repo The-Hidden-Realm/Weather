@@ -14,8 +14,10 @@ export function CameraSidePanel({
   cameras,
   categories,
   isAdmin,
+  draggingCameraId,
   onClose,
   onPickCamera,
+  onDragCameraStart,
   onAddCamera,
   onEditCamera,
   onDeleteCamera,
@@ -24,8 +26,13 @@ export function CameraSidePanel({
   cameras: CameraRow[];
   categories: string[];
   isAdmin: boolean;
+  // Which camera (if any) is currently being dragged out of this list.
+  draggingCameraId: number | null;
   onClose?: () => void;
   onPickCamera: (camera: CameraRow) => void;
+  // Starts a pointer-based drag of this camera toward a grid slot — see
+  // CameraDashboard, which owns the actual drag state and drop handling.
+  onDragCameraStart: (cameraId: number, e: React.PointerEvent) => void;
   onAddCamera: () => void;
   onEditCamera: (camera: CameraRow) => void;
   onDeleteCamera: (camera: CameraRow) => void;
@@ -203,18 +210,34 @@ export function CameraSidePanel({
         {filtered.map((camera) => (
           <div
             key={camera.id}
-            draggable
-            onDragStart={(e) => {
+            onPointerDown={(e) => {
               cancelPreview();
-              e.dataTransfer.effectAllowed = "copy";
-              e.dataTransfer.setData("application/json", JSON.stringify({ type: "camera", cameraId: camera.id }));
+              // See CameraTile's onPointerDown for why this matters — without
+              // capture, a drag that crosses a grid tile's iframe can get
+              // silently handed off to it, leaving the drag stuck.
+              e.currentTarget.setPointerCapture(e.pointerId);
+              onDragCameraStart(camera.id, e);
             }}
             onMouseEnter={(e) => schedulePreview(camera, e.currentTarget)}
             onMouseLeave={cancelPreview}
-            className="cursor-grab rounded-xl border border-border/60 bg-surface-2/60 p-2.5 transition hover:border-accent/50 active:cursor-grabbing"
+            // Without this, a drag gesture that starts on the name/category
+            // text triggers the browser's native text-selection instead —
+            // it fights the drag (the cursor flips to an I-beam, movement
+            // stops registering as a drag) and it's inconsistent because it
+            // only kicks in when the pointer happens to land on a text node.
+            className={`cursor-grab select-none rounded-xl border border-border/60 bg-surface-2/60 p-2.5 transition hover:border-accent/50 active:cursor-grabbing ${
+              draggingCameraId === camera.id ? "opacity-40" : ""
+            }`}
           >
             <button type="button" onClick={() => onPickCamera(camera)} className="block w-full text-left">
-              <p className="text-sm font-medium text-foreground">{camera.name}</p>
+              <p className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+                {camera.name}
+                {camera.is_offline === 1 && (
+                  <span className="rounded bg-danger/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-danger">
+                    Offline
+                  </span>
+                )}
+              </p>
               <p className="text-xs text-muted">
                 {camera.category}
                 {camera.has_audio === 1 && " · Audio"}
@@ -225,6 +248,7 @@ export function CameraSidePanel({
                 <button
                   type="button"
                   onClick={() => onEditCamera(camera)}
+                  onPointerDown={(e) => e.stopPropagation()}
                   className="text-xs text-accent-2 hover:underline"
                 >
                   Edit
@@ -232,6 +256,7 @@ export function CameraSidePanel({
                 <button
                   type="button"
                   onClick={() => onDeleteCamera(camera)}
+                  onPointerDown={(e) => e.stopPropagation()}
                   className="text-xs text-danger hover:underline"
                 >
                   Delete
@@ -248,7 +273,16 @@ export function CameraSidePanel({
           style={{ top: preview.top, left: preview.left, width: PREVIEW_WIDTH }}
         >
           <div className="aspect-video w-full bg-black">
-            {isDirectVideoSource(preview.camera.source_url) ? (
+            {preview.camera.is_offline === 1 ? (
+              <div className="flex h-full w-full flex-col items-center justify-center gap-1.5 bg-black/90">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-danger">
+                  <rect x="2" y="6" width="14" height="12" rx="2" />
+                  <path d="m22 8-6 4 6 4V8Z" />
+                  <path d="M2 2l20 20" />
+                </svg>
+                <span className="text-[11px] font-medium text-danger">Offline</span>
+              </div>
+            ) : isDirectVideoSource(preview.camera.source_url) ? (
               <video
                 key={preview.camera.source_url}
                 src={preview.camera.source_url}

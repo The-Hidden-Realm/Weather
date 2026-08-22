@@ -5,18 +5,29 @@ import type { CameraRow } from "@/lib/db";
 import { CameraGrid } from "@/components/CameraGrid";
 import { CameraSidePanel } from "@/components/CameraSidePanel";
 import { CameraFormModal } from "@/components/CameraFormModal";
-
-const SLOT_COUNT = 6;
+import type { CameraDragData } from "@/components/CameraTile";
+import { CAMERA_CATALOG_CHANGED_EVENT } from "@/lib/camera-utils";
+import { CAMERA_LAYOUTS, MAX_CAMERA_SLOTS, type CameraLayoutMode } from "@/lib/camera-utils";
 
 export function CameraDashboard({ isAdmin }: { isAdmin: boolean }) {
   const [cameras, setCameras] = useState<CameraRow[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
-  const [layout, setLayout] = useState<(number | null)[]>(new Array(SLOT_COUNT).fill(null));
+  const [layout, setLayout] = useState<(number | null)[]>(new Array(MAX_CAMERA_SLOTS).fill(null));
+  const [layoutMode, setLayoutMode] = useState<CameraLayoutMode>(6);
   const [selectedSlot, setSelectedSlot] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [formCamera, setFormCamera] = useState<CameraRow | null | "new">(null);
   const [deleteTarget, setDeleteTarget] = useState<CameraRow | null>(null);
+  // Pointer-based drag-and-drop (not native HTML5 DnD, which doesn't work on
+  // touch and is inconsistent across browsers/trackpads) — set on pointerdown
+  // over a draggable source, cleared on pointerup anywhere in the window.
+  const [dragSource, setDragSource] = useState<CameraDragData | null>(null);
+  const [dragOverSlot, setDragOverSlot] = useState<number | null>(null);
+  // Drives the floating "you're dragging this" preview that follows the
+  // cursor — native HTML5 drag gave us that ghost image for free, this is
+  // its replacement now that dragging is plain pointer events.
+  const [dragPointerPos, setDragPointerPos] = useState<{ x: number; y: number } | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -75,6 +86,81 @@ export function CameraDashboard({ isAdmin }: { isAdmin: boolean }) {
     }
   }
 
+  // The camera controls dialog (Ctrl+Shift+C) lives in TopNav so it's
+  // reachable from every page, not just this one — it manages its own
+  // camera list and broadcasts this event on every change, so a grid
+  // that's currently mounted (this page) can pick it up without a reload.
+  useEffect(() => {
+    async function refreshCatalog() {
+      try {
+        const res = await fetch("/api/cameras");
+        if (!res.ok) return;
+        const data = await res.json();
+        setCameras(data.cameras);
+        setCategories(data.categories);
+      } catch {
+        // Ignore — the next change event (or a page reload) will retry.
+      }
+    }
+    window.addEventListener(CAMERA_CATALOG_CHANGED_EVENT, refreshCatalog);
+    return () => window.removeEventListener(CAMERA_CATALOG_CHANGED_EVENT, refreshCatalog);
+  }, []);
+
+  useEffect(() => {
+    if (!dragSource) return;
+
+    // Every grid tile carries data-camera-slot — hit-testing by real screen
+    // position (rather than relying on the pointerdown's original target)
+    // is what lets this work over an iframe/video tile the same as an empty
+    // one, and over touch the same as a mouse.
+    function slotAt(x: number, y: number): number | null {
+      const el = document.elementFromPoint(x, y);
+      const tile = el instanceof Element ? el.closest<HTMLElement>("[data-camera-slot]") : null;
+      if (!tile) return null;
+      const value = Number(tile.dataset.cameraSlot);
+      return Number.isInteger(value) ? value : null;
+    }
+
+    function onPointerMove(e: PointerEvent) {
+      setDragOverSlot(slotAt(e.clientX, e.clientY));
+      setDragPointerPos({ x: e.clientX, y: e.clientY });
+    }
+
+    function onPointerUp(e: PointerEvent) {
+      const target = slotAt(e.clientX, e.clientY);
+      if (target != null && dragSource) {
+        if (dragSource.type === "camera") {
+          setSelectedSlot(target);
+          assignSlot(target, dragSource.cameraId);
+        } else if (dragSource.type === "slot" && dragSource.slot !== target) {
+          handleSwapSlots(dragSource.slot, target);
+        }
+      }
+      setDragSource(null);
+      setDragOverSlot(null);
+      setDragPointerPos(null);
+    }
+
+    document.body.style.cursor = "grabbing";
+    // A fast drag can outrun the two draggable elements' own select-none and
+    // briefly cross other text on the page — selecting it mid-drag fights
+    // the gesture the same way. Suppressing selection page-wide for the
+    // duration of the drag closes that gap.
+    document.body.style.userSelect = "none";
+    window.addEventListener("pointermove", onPointerMove);
+    window.addEventListener("pointerup", onPointerUp);
+    return () => {
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerup", onPointerUp);
+    };
+    // assignSlot/handleSwapSlots close over `layout`, which doesn't change
+    // mid-drag — re-subscribing only when a drag actually starts/ends (not
+    // on every dragOverSlot update) is what matters here.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dragSource]);
+
   useEffect(() => {
     async function load() {
       setLoading(true);
@@ -89,6 +175,7 @@ export function CameraDashboard({ isAdmin }: { isAdmin: boolean }) {
         setCameras(camerasData.cameras);
         setCategories(camerasData.categories);
         setLayout(layoutData.layout);
+        setLayoutMode(layoutData.mode);
       } catch {
         setError("Couldn't load cameras. Try refreshing the page.");
       } finally {
@@ -100,12 +187,38 @@ export function CameraDashboard({ isAdmin }: { isAdmin: boolean }) {
 
   const camerasById = useMemo(() => new Map(cameras.map((c) => [c.id, c])), [cameras]);
 
+  const draggedCameraId = dragSource
+    ? dragSource.type === "camera"
+      ? dragSource.cameraId
+      : layout[dragSource.slot]
+    : null;
+  const draggedCameraName = draggedCameraId != null ? camerasById.get(draggedCameraId)?.name : undefined;
+
   // Outside fullscreen the list is always visible; in fullscreen it starts
   // collapsed and is toggled via the hamburger button in the grid header.
   const panelOpen = isFullscreen ? fullscreenPanelOpen : true;
 
   function togglePanel() {
     setFullscreenPanelOpen((o) => !o);
+  }
+
+  async function handleLayoutModeChange(mode: CameraLayoutMode) {
+    const previous = layoutMode;
+    setLayoutMode(mode);
+    // The selected slot may not exist in the new mode (e.g. slot 8 while
+    // switching from 9-view down to 4-view) — fall back to the first tile.
+    const visibleSlots = CAMERA_LAYOUTS[mode].slotAreas.length;
+    if (selectedSlot >= visibleSlots) setSelectedSlot(0);
+    try {
+      const res = await fetch("/api/camera-layout", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode }),
+      });
+      if (!res.ok) throw new Error("Failed to save layout.");
+    } catch {
+      setLayoutMode(previous);
+    }
   }
 
   async function putSlot(slot: number, cameraId: number | null) {
@@ -117,21 +230,24 @@ export function CameraDashboard({ isAdmin }: { isAdmin: boolean }) {
   }
 
   async function assignSlot(slot: number, cameraId: number | null) {
+    // A camera can only occupy one grid slot at a time — besides being
+    // confusing, having the same source streaming into multiple tiles at
+    // once is what made buffering unreliable (duplicate connections fighting
+    // over the same feed). Assigning it to a new slot moves it, clearing
+    // wherever else it was.
+    const duplicateSlots =
+      cameraId == null ? [] : layout.flatMap((id, i) => (i !== slot && id === cameraId ? [i] : []));
     setLayout((prev) => {
       const next = [...prev];
+      for (const i of duplicateSlots) next[i] = null;
       next[slot] = cameraId;
       return next;
     });
-    await putSlot(slot, cameraId);
+    await Promise.all([putSlot(slot, cameraId), ...duplicateSlots.map((i) => putSlot(i, null))]);
   }
 
   async function assignCamera(camera: CameraRow) {
     await assignSlot(selectedSlot, camera.id);
-  }
-
-  async function handleDropCamera(slot: number, cameraId: number) {
-    setSelectedSlot(slot);
-    await assignSlot(slot, cameraId);
   }
 
   async function handleRemoveSlot(slot: number) {
@@ -195,14 +311,20 @@ export function CameraDashboard({ isAdmin }: { isAdmin: boolean }) {
         <CameraGrid
           layout={layout}
           camerasById={camerasById}
+          layoutMode={layoutMode}
+          onLayoutModeChange={handleLayoutModeChange}
           selectedSlot={selectedSlot}
           onSelectSlot={setSelectedSlot}
           isFullscreen={isFullscreen}
           onToggleFullscreen={toggleFullscreen}
           panelOpen={panelOpen}
           onTogglePanel={togglePanel}
-          onDropCamera={handleDropCamera}
-          onSwapSlots={handleSwapSlots}
+          dragOverSlot={dragOverSlot}
+          draggingSlot={dragSource?.type === "slot" ? dragSource.slot : null}
+          onTileDragStart={(slot, e) => {
+            setDragSource({ type: "slot", slot });
+            setDragPointerPos({ x: e.clientX, y: e.clientY });
+          }}
           onRemoveSlot={handleRemoveSlot}
         />
       </div>
@@ -214,6 +336,11 @@ export function CameraDashboard({ isAdmin }: { isAdmin: boolean }) {
           isAdmin={isAdmin}
           onClose={isFullscreen ? togglePanel : undefined}
           onPickCamera={assignCamera}
+          draggingCameraId={dragSource?.type === "camera" ? dragSource.cameraId : null}
+          onDragCameraStart={(cameraId, e) => {
+            setDragSource({ type: "camera", cameraId });
+            setDragPointerPos({ x: e.clientX, y: e.clientY });
+          }}
           onAddCamera={() => setFormCamera("new")}
           onEditCamera={(camera) => setFormCamera(camera)}
           onDeleteCamera={(camera) => setDeleteTarget(camera)}
@@ -259,6 +386,19 @@ export function CameraDashboard({ isAdmin }: { isAdmin: boolean }) {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {dragSource && dragPointerPos && (
+        <div
+          className="pointer-events-none fixed z-50 flex -translate-x-1/2 -translate-y-1/2 items-center gap-1.5 rounded-lg border border-accent bg-surface-2 px-3 py-1.5 text-xs font-medium text-foreground shadow-2xl"
+          style={{ left: dragPointerPos.x, top: dragPointerPos.y }}
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+            <rect x="2" y="6" width="14" height="12" rx="2" />
+            <path d="m22 8-6 4 6 4V8Z" />
+          </svg>
+          {draggedCameraName ?? "Camera"}
         </div>
       )}
     </div>
