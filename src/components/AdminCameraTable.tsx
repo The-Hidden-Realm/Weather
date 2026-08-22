@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import type { CameraRow, CameraRemovalRequestRow } from "@/lib/db";
 import { CameraFormModal } from "@/components/CameraFormModal";
-import { camerasToCsv, isDirectVideoSource, parseCamerasCsv } from "@/lib/camera-utils";
+import { HazcamsFrame } from "@/components/CameraTile";
+import { camerasToCsv, isDirectVideoSource, isHazcamsUrl, parseCamerasCsv } from "@/lib/camera-utils";
 
 type RemovalRequest = CameraRemovalRequestRow & { camera_name: string; requested_by_username: string };
 
@@ -563,6 +564,7 @@ function CameraNamePreview({ camera }: { camera: CameraRow }) {
   }
 
   const isDirectVideo = isDirectVideoSource(camera.source_url);
+  const isHazcams = isHazcamsUrl(camera.source_url);
 
   return (
     <span
@@ -577,7 +579,7 @@ function CameraNamePreview({ camera }: { camera: CameraRow }) {
           style={{ position: "fixed", top: pos.top, left: pos.left }}
           className="z-[70] w-56 overflow-hidden rounded-xl border border-border bg-black shadow-2xl"
         >
-          <div className="aspect-video w-full bg-black">
+          <div className="relative aspect-video w-full bg-black">
             {isDirectVideo ? (
               <video
                 src={camera.source_url}
@@ -587,6 +589,8 @@ function CameraNamePreview({ camera }: { camera: CameraRow }) {
                 playsInline
                 className="h-full w-full object-cover"
               />
+            ) : isHazcams ? (
+              <HazcamsFrame src={camera.source_url} />
             ) : (
               <iframe src={camera.source_url} className="h-full w-full border-0" allow="autoplay" />
             )}

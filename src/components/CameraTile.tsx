@@ -143,7 +143,10 @@ const HAZCAMS_CROP_SCALE = 1.55;
 const HAZCAMS_CROP_TRANSLATE_X = -(HAZCAMS_REF_WIDTH * (HAZCAMS_CROP_SCALE - 1)) / 2;
 const HAZCAMS_CROP_TRANSLATE_Y = -60 * HAZCAMS_CROP_SCALE;
 
-function HazcamsFrame({ src, onLoad }: { src: string; onLoad: () => void }) {
+// Exported so any other spot embedding a hazcams.com source (e.g. the admin
+// table's hover preview) renders it identically to a grid tile, instead of
+// showing their raw chrome in one place and a cropped feed in another.
+export function HazcamsFrame({ src, onLoad }: { src: string; onLoad?: () => void }) {
   const outerRef = useRef<HTMLDivElement>(null);
   const [fitScale, setFitScale] = useState(1);
 
